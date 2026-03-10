@@ -1,0 +1,10 @@
+{
+  "id": "xom-expert",
+  "name": "XOM Expert",
+  "description": "ExxonMobil (XOM) expert agent — deep knowledge of ExxonMobil's business, financials, strategy, and operations.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}
