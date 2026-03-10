@@ -1,0 +1,1201 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>XOM Expert — Intelligence Terminal</title>
+  <style>
+    /* ── Tokens & Reset ─────────────────────────────────────────── */
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --neon:#00d4ff;--neon2:#7c3aed;--neon3:#f59e0b;
+      --red:#e31837;--red2:#ff4d6d;--green:#00ff88;--green2:#10b981;
+      --glass:rgba(255,255,255,0.05);--glass-hi:rgba(255,255,255,0.10);
+      --glass-border:rgba(255,255,255,0.12);
+      --bg-deep:#020408;
+      --text1:#f0f6ff;--text2:#8fa3c0;--text3:#3d5470;
+      --r:12px;--font:'Inter',system-ui,sans-serif;--mono:'JetBrains Mono','Fira Code',monospace;
+    }
+    html,body{height:100%;background:var(--bg-deep);color:var(--text1);font-family:var(--font);font-size:13.5px;line-height:1.6;overflow:hidden}
+
+    /* ── Animated Background ────────────────────────────────────── */
+    #bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+    .orb{
+      position:fixed;border-radius:50%;filter:blur(120px);opacity:0.18;pointer-events:none;
+      animation:orbFloat 18s ease-in-out infinite;
+    }
+    .orb1{width:600px;height:600px;background:radial-gradient(circle,#7c3aed,transparent 70%);top:-200px;left:-200px;animation-delay:-4s}
+    .orb2{width:500px;height:500px;background:radial-gradient(circle,#00d4ff,transparent 70%);top:40%;right:-150px;animation-delay:-9s}
+    .orb3{width:400px;height:400px;background:radial-gradient(circle,#e31837,transparent 70%);bottom:-100px;left:30%;animation-delay:-14s}
+    @keyframes orbFloat{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(40px,-30px) scale(1.05)}66%{transform:translate(-30px,40px) scale(0.95)}}
+
+    /* ── Grid ────────────────────────────────────────────────────── */
+    .layout{display:grid;grid-template-rows:60px 1fr;grid-template-columns:230px 1fr;height:100vh;position:relative;z-index:1}
+
+    /* ── Glass utility ──────────────────────────────────────────── */
+    .glass{background:var(--glass);backdrop-filter:blur(20px) saturate(1.8);border:1px solid var(--glass-border)}
+
+    /* ── Top Bar ─────────────────────────────────────────────────── */
+    .topbar{
+      grid-column:1/-1;
+      display:flex;align-items:center;gap:16px;padding:0 22px;
+      background:rgba(2,4,8,0.7);backdrop-filter:blur(24px);
+      border-bottom:1px solid var(--glass-border);
+    }
+    .topbar-logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text1);font-weight:700;font-size:15px}
+    .logo-pill{
+      background:linear-gradient(135deg,#e31837,#7c3aed);
+      color:#fff;font-weight:800;font-size:12px;padding:3px 10px;border-radius:20px;letter-spacing:1px;
+      box-shadow:0 0 18px rgba(227,24,55,0.5);
+    }
+    .topbar-tickers{margin-left:auto;display:flex;align-items:center;gap:28px}
+    .tick{display:flex;align-items:baseline;gap:6px}
+    .tick-label{font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.8px}
+    .tick-val{font-size:15px;font-weight:700;font-family:var(--mono);color:var(--text1)}
+    .tick-chg{font-size:11px;font-weight:600}
+    .up{color:var(--green)}
+    .dn{color:var(--red2)}
+    .topbar-time{font-size:11px;color:var(--text3);font-family:var(--mono);padding-left:16px;border-left:1px solid var(--glass-border)}
+
+    /* ── Sidebar ─────────────────────────────────────────────────── */
+    .sidebar{
+      background:rgba(2,4,8,0.6);backdrop-filter:blur(28px);
+      border-right:1px solid var(--glass-border);
+      display:flex;flex-direction:column;padding:16px 0;overflow-y:auto;
+    }
+    .nav-sect{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text3);padding:10px 20px 4px}
+    .nav-item{
+      display:flex;align-items:center;gap:10px;padding:9px 20px;cursor:pointer;
+      font-size:12.5px;font-weight:500;color:var(--text2);
+      border-left:2px solid transparent;transition:all .15s;user-select:none;
+    }
+    .nav-item:hover{color:var(--text1);background:var(--glass-hi)}
+    .nav-item.active{
+      color:var(--text1);background:linear-gradient(90deg,rgba(0,212,255,.08),transparent);
+      border-left-color:var(--neon);
+    }
+    .nav-icon{font-size:15px;width:20px;text-align:center}
+    .nav-hr{height:1px;background:var(--glass-border);margin:10px 20px}
+    .nav-signal{
+      margin:0 12px 8px;padding:10px 12px;border-radius:var(--r);
+      background:linear-gradient(135deg,rgba(0,255,136,.08),rgba(0,212,255,.06));
+      border:1px solid rgba(0,255,136,.2);
+    }
+    .signal-label{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--green);margin-bottom:3px}
+    .signal-val{font-size:14px;font-weight:800;color:var(--green);font-family:var(--mono)}
+    .signal-sub{font-size:10px;color:var(--text3);margin-top:2px}
+
+    /* ── Main ────────────────────────────────────────────────────── */
+    .main{overflow-y:auto;display:flex;flex-direction:column}
+    .view{display:none;flex-direction:column;gap:18px;padding:22px}
+    .view.active{display:flex}
+
+    /* ── Page header ─────────────────────────────────────────────── */
+    .ph{display:flex;align-items:flex-start;justify-content:space-between}
+    .ph-title{font-size:19px;font-weight:700;letter-spacing:-.3px}
+    .ph-sub{font-size:12px;color:var(--text3);margin-top:2px}
+    .pill{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid}
+    .pill-live{border-color:rgba(0,255,136,.3);color:var(--green);background:rgba(0,255,136,.08)}
+    .pill-buy{border-color:rgba(0,255,136,.4);color:var(--green);background:rgba(0,255,136,.12)}
+    .pill-sell{border-color:rgba(255,77,109,.4);color:var(--red2);background:rgba(255,77,109,.12)}
+    .pill-hold{border-color:rgba(245,158,11,.4);color:var(--neon3);background:rgba(245,158,11,.1)}
+
+    /* ── Grid layouts ────────────────────────────────────────────── */
+    .g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+    .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+
+    /* ── Glass card ──────────────────────────────────────────────── */
+    .card{
+      background:rgba(255,255,255,.03);backdrop-filter:blur(20px);
+      border:1px solid var(--glass-border);border-radius:var(--r);padding:18px;
+      transition:border-color .2s,box-shadow .2s;
+    }
+    .card:hover{border-color:rgba(255,255,255,.2);box-shadow:0 0 30px rgba(0,212,255,.06)}
+    .card-title{font-size:10px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;color:var(--text3);margin-bottom:14px}
+
+    /* ── Metric card ─────────────────────────────────────────────── */
+    .mc{
+      background:rgba(255,255,255,.03);border:1px solid var(--glass-border);border-radius:var(--r);
+      padding:16px;display:flex;flex-direction:column;gap:5px;position:relative;overflow:hidden;
+    }
+    .mc::before{
+      content:'';position:absolute;inset:-1px;border-radius:inherit;
+      background:linear-gradient(135deg,rgba(0,212,255,.12),transparent 50%,rgba(124,58,237,.08));
+      opacity:0;transition:opacity .3s;z-index:0;pointer-events:none;
+    }
+    .mc:hover::before{opacity:1}
+    .mc>*{position:relative;z-index:1}
+    .mc-label{font-size:10px;color:var(--text3);font-weight:700;letter-spacing:.6px;text-transform:uppercase}
+    .mc-val{font-size:22px;font-weight:700;font-family:var(--mono);color:var(--text1)}
+    .mc-sub{font-size:11px;color:var(--text3)}
+
+    /* ── Glow number ────────────────────────────────────────────── */
+    .glow-green{color:var(--green);text-shadow:0 0 20px rgba(0,255,136,.5)}
+    .glow-red{color:var(--red2);text-shadow:0 0 20px rgba(255,77,109,.5)}
+    .glow-blue{color:var(--neon);text-shadow:0 0 20px rgba(0,212,255,.4)}
+
+    /* ── Table ───────────────────────────────────────────────────── */
+    .dt{width:100%;border-collapse:collapse}
+    .dt th{text-align:left;padding:7px 10px;font-size:9.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--glass-border)}
+    .dt td{padding:9px 10px;font-size:12.5px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--text2)}
+    .dt td:first-child{color:var(--text1);font-weight:600}
+    .dt tr:last-child td{border-bottom:0}
+    .dt tr:hover td{background:var(--glass-hi)}
+    .num{font-family:var(--mono);text-align:right}
+
+    /* ── Options signal table ─────────────────────────────────────── */
+    .signal-badge{
+      display:inline-flex;align-items:center;gap:4px;
+      padding:3px 9px;border-radius:20px;font-size:10.5px;font-weight:700;
+    }
+    .sb-buy{background:rgba(0,255,136,.12);color:var(--green);border:1px solid rgba(0,255,136,.25)}
+    .sb-sell{background:rgba(255,77,109,.12);color:var(--red2);border:1px solid rgba(255,77,109,.25)}
+    .sb-hold{background:rgba(245,158,11,.1);color:var(--neon3);border:1px solid rgba(245,158,11,.25)}
+    .conf-bar{display:inline-flex;gap:2px;vertical-align:middle}
+    .conf-bar span{width:6px;height:14px;border-radius:2px;background:var(--text3);display:inline-block}
+    .conf-bar.c5 span:nth-child(-n+5){background:var(--green)}
+    .conf-bar.c4 span:nth-child(-n+4){background:var(--green)}
+    .conf-bar.c3 span:nth-child(-n+3){background:var(--neon3)}
+    .conf-bar.c2 span:nth-child(-n+2){background:var(--neon3)}
+    .conf-bar.c1 span:nth-child(-n+1){background:var(--red2)}
+
+    /* ── Bar segment ─────────────────────────────────────────────── */
+    .seg-row{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+    .seg-row:last-child{margin-bottom:0}
+    .seg-hd{display:flex;justify-content:space-between;align-items:baseline}
+    .seg-name{font-size:12.5px;font-weight:600}
+    .seg-pct{font-size:11px;color:var(--text3);font-family:var(--mono)}
+    .bar-track{height:5px;background:rgba(255,255,255,.06);border-radius:99px;overflow:hidden}
+    .bar-fill{height:100%;border-radius:99px;transition:width 1s cubic-bezier(.4,0,.2,1)}
+
+    /* ── Asset card ──────────────────────────────────────────────── */
+    .asset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .ac{
+      background:rgba(255,255,255,.03);border:1px solid var(--glass-border);
+      border-radius:var(--r);padding:14px;
+      border-top:2px solid var(--neon);
+      transition:box-shadow .2s;
+    }
+    .ac:hover{box-shadow:0 0 24px rgba(0,212,255,.1)}
+    .ac-name{font-size:13px;font-weight:700;margin-bottom:3px}
+    .ac-region{font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+    .ac-stat{font-size:11.5px;color:var(--text2);margin-bottom:2px}
+    .ac-stat strong{color:var(--text1);font-family:var(--mono)}
+
+    /* ── Sparkline ───────────────────────────────────────────────── */
+    .sparkline{display:flex;align-items:flex-end;gap:2px;height:36px}
+    .sp-bar{flex:1;border-radius:2px 2px 0 0;min-height:3px;background:linear-gradient(to top,var(--neon),rgba(0,212,255,.3));opacity:.8;transition:opacity .2s}
+    .sp-bar:hover{opacity:1}
+
+    /* ── Chat ────────────────────────────────────────────────────── */
+    .chat-wrap{flex:1;display:flex;flex-direction:column;min-height:0;height:calc(100vh - 60px)}
+    .chat-msgs{
+      flex:1;overflow-y:auto;padding:20px;
+      display:flex;flex-direction:column;gap:14px;min-height:300px;
+    }
+    .msg{display:flex;gap:10px;max-width:860px}
+    .msg.user{flex-direction:row-reverse;align-self:flex-end}
+    .msg-av{
+      width:32px;height:32px;border-radius:50%;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;
+    }
+    .av-agent{background:linear-gradient(135deg,#e31837,#7c3aed);box-shadow:0 0 14px rgba(124,58,237,.4)}
+    .av-user{background:linear-gradient(135deg,#00d4ff,#7c3aed);box-shadow:0 0 14px rgba(0,212,255,.3)}
+    .msg-bub{
+      padding:12px 15px;border-radius:14px;font-size:13px;line-height:1.7;max-width:680px;
+    }
+    .msg.agent .msg-bub{
+      background:rgba(255,255,255,.05);backdrop-filter:blur(16px);
+      border:1px solid var(--glass-border);color:var(--text1);border-top-left-radius:4px;
+    }
+    .msg.user .msg-bub{
+      background:linear-gradient(135deg,rgba(0,212,255,.2),rgba(124,58,237,.2));
+      border:1px solid rgba(0,212,255,.2);color:var(--text1);border-top-right-radius:4px;
+    }
+    .msg-bub ul{padding-left:16px;margin-top:6px}
+    .msg-bub li{margin-bottom:3px}
+    .msg-bub p+p{margin-top:8px}
+    .msg-time{font-size:10px;color:var(--text3);margin-top:4px}
+    .msg.user .msg-time{text-align:right}
+    .typing-dots span{
+      display:inline-block;width:6px;height:6px;background:var(--text3);
+      border-radius:50%;margin:0 2px;animation:bounce 1.2s infinite;
+    }
+    .typing-dots span:nth-child(2){animation-delay:.2s}
+    .typing-dots span:nth-child(3){animation-delay:.4s}
+    @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
+    .chat-suggestions{display:flex;flex-wrap:wrap;gap:7px;padding:10px 20px 0}
+    .chip{
+      padding:5px 12px;border-radius:20px;font-size:11.5px;cursor:pointer;
+      background:rgba(255,255,255,.04);border:1px solid var(--glass-border);color:var(--text2);
+      transition:all .15s;
+    }
+    .chip:hover{border-color:var(--neon);color:var(--text1);background:rgba(0,212,255,.06)}
+    .chat-input-row{
+      border-top:1px solid var(--glass-border);padding:14px 18px;
+      background:rgba(2,4,8,.7);backdrop-filter:blur(20px);
+      display:flex;gap:10px;align-items:flex-end;
+    }
+    .chat-input{
+      flex:1;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);
+      color:var(--text1);border-radius:10px;padding:10px 14px;
+      font-size:13px;font-family:var(--font);resize:none;min-height:42px;max-height:140px;
+      outline:none;line-height:1.5;
+    }
+    .chat-input:focus{border-color:rgba(0,212,255,.4);box-shadow:0 0 16px rgba(0,212,255,.1)}
+    .chat-input::placeholder{color:var(--text3)}
+    .btn-send{
+      background:linear-gradient(135deg,#e31837,#7c3aed);color:#fff;border:none;
+      border-radius:10px;padding:10px 18px;font-size:12.5px;font-weight:700;
+      cursor:pointer;height:42px;white-space:nowrap;transition:all .15s;
+      box-shadow:0 0 20px rgba(227,24,55,.3);
+    }
+    .btn-send:hover{box-shadow:0 0 28px rgba(227,24,55,.5);transform:translateY(-1px)}
+    .btn-send:active{transform:scale(.97)}
+
+    /* ── Timeline ────────────────────────────────────────────────── */
+    .tl{display:flex;flex-direction:column;gap:0}
+    .tl-item{display:flex;gap:12px;padding-bottom:18px;position:relative}
+    .tl-item::before{content:'';position:absolute;left:14px;top:28px;bottom:0;width:1px;background:var(--glass-border)}
+    .tl-item:last-child::before{display:none}
+    .tl-dot{
+      width:28px;height:28px;border-radius:50%;flex-shrink:0;
+      background:rgba(255,255,255,.04);border:1px solid var(--glass-border);
+      display:flex;align-items:center;justify-content:center;font-size:12px;
+      position:relative;z-index:1;
+    }
+    .tl-dot.done{border-color:rgba(0,212,255,.4);background:rgba(0,212,255,.08);box-shadow:0 0 12px rgba(0,212,255,.2)}
+    .tl-body{flex:1;padding-top:3px}
+    .tl-title{font-size:13px;font-weight:600}
+    .tl-date{font-size:10.5px;color:var(--neon);margin-top:1px}
+    .tl-desc{font-size:11.5px;color:var(--text2);margin-top:4px}
+
+    /* ── Scrollbar ───────────────────────────────────────────────── */
+    ::-webkit-scrollbar{width:5px;height:5px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:99px}
+
+    /* ── Scan-line overlay ───────────────────────────────────────── */
+    .scanlines{
+      position:fixed;inset:0;pointer-events:none;z-index:999;
+      background:repeating-linear-gradient(0deg,rgba(0,0,0,.03) 0,rgba(0,0,0,.03) 1px,transparent 1px,transparent 2px);
+    }
+
+    @media(max-width:900px){
+      .layout{grid-template-columns:1fr;grid-template-rows:60px auto 1fr}
+      .sidebar{display:none}
+      .g4{grid-template-columns:repeat(2,1fr)}
+      .g3{grid-template-columns:1fr 1fr}
+      .asset-grid{grid-template-columns:1fr 1fr}
+    }
+  </style>
+</head>
+<body>
+<!-- Scan-line texture -->
+<div class="scanlines"></div>
+
+<!-- Orbs -->
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+<div class="orb orb3"></div>
+
+<div class="layout">
+
+  <!-- ── TOP BAR ──────────────────────────────────────────── -->
+  <header class="topbar">
+    <a class="topbar-logo" href="#">
+      <span class="logo-pill">XOM</span>
+      Expert Intelligence Terminal
+    </a>
+    <div class="topbar-tickers">
+      <div class="tick">
+        <span class="tick-label">XOM</span>
+        <span class="tick-val" id="t-price">$108.42</span>
+        <span class="tick-chg up" id="t-chg">▲ +1.24 (+1.16%)</span>
+      </div>
+      <div class="tick">
+        <span class="tick-label">IV30</span>
+        <span class="tick-val" id="t-iv">22.4%</span>
+        <span class="tick-chg dn" id="t-iv-chg">▼ −0.8%</span>
+      </div>
+      <div class="tick">
+        <span class="tick-label">Brent</span>
+        <span class="tick-val" id="t-brent">$79.18</span>
+        <span class="tick-chg dn">▼ −0.43</span>
+      </div>
+      <div class="tick">
+        <span class="tick-label">WTI</span>
+        <span class="tick-val">$75.92</span>
+        <span class="tick-chg up">▲ +0.18</span>
+      </div>
+      <span class="topbar-time" id="t-time">—</span>
+    </div>
+  </header>
+
+  <!-- ── SIDEBAR ───────────────────────────────────────────── -->
+  <nav class="sidebar">
+    <div class="nav-signal">
+      <div class="signal-label">▲ Overall Signal</div>
+      <div class="signal-val">BULLISH</div>
+      <div class="signal-sub">Composite score: 74/100</div>
+    </div>
+    <div class="nav-sect">Overview</div>
+    <div class="nav-item active" data-view="dashboard"><span class="nav-icon">⬡</span> Dashboard</div>
+    <div class="nav-item" data-view="financials"><span class="nav-icon">📊</span> Financials</div>
+    <div class="nav-hr"></div>
+    <div class="nav-sect">Intelligence</div>
+    <div class="nav-item" data-view="options"><span class="nav-icon">⚡</span> Options Signals</div>
+    <div class="nav-item" data-view="chat"><span class="nav-icon">◈</span> XOM Expert Chat</div>
+    <div class="nav-hr"></div>
+    <div class="nav-sect">Business</div>
+    <div class="nav-item" data-view="segments"><span class="nav-icon">◉</span> Segments</div>
+    <div class="nav-item" data-view="assets"><span class="nav-icon">◎</span> Key Assets</div>
+    <div class="nav-item" data-view="lowcarbon"><span class="nav-icon">◈</span> Low Carbon</div>
+    <div class="nav-item" data-view="catalysts"><span class="nav-icon">◆</span> Catalysts</div>
+  </nav>
+
+  <!-- ── MAIN ─────────────────────────────────────────────── -->
+  <main class="main">
+
+    <!-- ── DASHBOARD ──────────────────────────────── -->
+    <div class="view active" id="view-dashboard">
+      <div class="ph">
+        <div>
+          <div class="ph-title">ExxonMobil Corporation</div>
+          <div class="ph-sub">NYSE: XOM · S&P 500 · Energy · Market Cap ~$459B</div>
+        </div>
+        <span class="pill pill-live">● Live Quotes</span>
+      </div>
+
+      <!-- Sparkline mini-chart -->
+      <div class="card">
+        <div class="card-title">30-Day Price Action (Simulated)</div>
+        <div class="sparkline" id="sparkline"></div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px">
+          <span style="font-size:10px;color:var(--text3);font-family:var(--mono)">30d ago · $102.10</span>
+          <span style="font-size:10px;color:var(--green);font-family:var(--mono)">Today · $108.42 (+6.2%)</span>
+        </div>
+      </div>
+
+      <div class="g4">
+        <div class="mc"><div class="mc-label">Market Cap</div><div class="mc-val glow-blue">$459B</div><div class="mc-sub">Mar 2026</div></div>
+        <div class="mc"><div class="mc-label">Dividend Yield</div><div class="mc-val glow-green">3.66%</div><div class="mc-sub">$0.99/qtr · Aristocrat</div></div>
+        <div class="mc"><div class="mc-label">FCF 2025E</div><div class="mc-val glow-blue">~$33B</div><div class="mc-sub">Post-Pioneer synergies</div></div>
+        <div class="mc"><div class="mc-label">ROCE</div><div class="mc-val glow-green">13.2%</div><div class="mc-sub">Best-in-class majors</div></div>
+      </div>
+
+      <div class="g2">
+        <div class="card">
+          <div class="card-title">EPS History &amp; Estimates</div>
+          <table class="dt">
+            <thead><tr><th>Year</th><th class="num">EPS (Adj.)</th><th class="num">YoY</th></tr></thead>
+            <tbody>
+              <tr><td>2021</td><td class="num">$5.42</td><td class="num">—</td></tr>
+              <tr><td>2022</td><td class="num">$14.43</td><td class="num up">+166%</td></tr>
+              <tr><td>2023</td><td class="num">$9.32</td><td class="num dn">−35%</td></tr>
+              <tr><td>2024</td><td class="num">$8.61</td><td class="num dn">−8%</td></tr>
+              <tr><td style="color:var(--neon)">2025E</td><td class="num up">$8.90</td><td class="num up">+7%</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-title">Analyst Consensus</div>
+          <div class="g2" style="margin-bottom:14px">
+            <div class="mc"><div class="mc-label">Rating</div><div class="mc-val glow-green" style="font-size:16px">BUY</div><div class="mc-sub">16 Buy / 9 Hold / 2 Sell</div></div>
+            <div class="mc"><div class="mc-label">Avg Price Target</div><div class="mc-val glow-blue">$124.50</div><div class="mc-sub">+14.8% upside</div></div>
+          </div>
+          <table class="dt">
+            <thead><tr><th>Metric</th><th class="num">XOM</th><th class="num">CVX (peer)</th></tr></thead>
+            <tbody>
+              <tr><td>P/E (NTM)</td><td class="num">12.2x</td><td class="num">13.1x</td></tr>
+              <tr><td>EV/EBITDA</td><td class="num">6.1x</td><td class="num">7.2x</td></tr>
+              <tr><td>Div. Yield</td><td class="num">3.66%</td><td class="num">4.3%</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── FINANCIALS ──────────────────────────────── -->
+    <div class="view" id="view-financials">
+      <div class="ph"><div><div class="ph-title">Financials</div><div class="ph-sub">Income statement, cash flow &amp; balance sheet</div></div></div>
+      <div class="card">
+        <div class="card-title">Income Statement ($B)</div>
+        <table class="dt">
+          <thead><tr><th>Metric</th><th class="num">2022</th><th class="num">2023</th><th class="num">2024</th><th class="num">2025E</th></tr></thead>
+          <tbody>
+            <tr><td>Revenue</td><td class="num">$398.7</td><td class="num">$334.7</td><td class="num">$339.2</td><td class="num">$352.0</td></tr>
+            <tr><td>EBITDA</td><td class="num">$64.0</td><td class="num">$53.2</td><td class="num">$51.3</td><td class="num">$55.0</td></tr>
+            <tr><td>Net Income</td><td class="num">$55.7</td><td class="num">$36.0</td><td class="num">$33.7</td><td class="num">$35.8</td></tr>
+            <tr><td style="color:var(--neon)">EPS (adj.)</td><td class="num">$14.43</td><td class="num">$9.32</td><td class="num">$8.61</td><td class="num up">$8.90E</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="g2">
+        <div class="card">
+          <div class="card-title">Free Cash Flow ($B)</div>
+          <table class="dt">
+            <thead><tr><th>Item</th><th class="num">2023</th><th class="num">2024</th></tr></thead>
+            <tbody>
+              <tr><td>Operating CF</td><td class="num">$55.4</td><td class="num">$55.0</td></tr>
+              <tr><td>CapEx</td><td class="num">$(20.5)</td><td class="num">$(23.2)</td></tr>
+              <tr><td style="color:var(--green)">Free Cash Flow</td><td class="num up">$34.9</td><td class="num up">$31.8</td></tr>
+              <tr><td>Dividends</td><td class="num dn">$(14.9)</td><td class="num dn">$(14.9)</td></tr>
+              <tr><td>Buybacks</td><td class="num dn">$(17.5)</td><td class="num dn">$(19.3)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-title">Balance Sheet ($B, Dec 2024)</div>
+          <table class="dt">
+            <thead><tr><th>Item</th><th class="num">Value</th></tr></thead>
+            <tbody>
+              <tr><td>Cash</td><td class="num up">$24.0</td></tr>
+              <tr><td>Total Assets</td><td class="num">$376.3</td></tr>
+              <tr><td>Total Debt</td><td class="num dn">$37.6</td></tr>
+              <tr><td>Net Debt</td><td class="num dn">$13.6</td></tr>
+              <tr><td>Equity</td><td class="num">$167.3</td></tr>
+              <tr><td>Debt/EBITDA</td><td class="num up">0.73x</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── OPTIONS SIGNALS ────────────────────────── -->
+    <div class="view" id="view-options">
+      <div class="ph">
+        <div>
+          <div class="ph-title">Options Intelligence &amp; Signals</div>
+          <div class="ph-sub">AI-generated buy/sell/hold signals · Educational use only · Not financial advice</div>
+        </div>
+        <span class="pill pill-buy">▲ Net Bullish</span>
+      </div>
+
+      <!-- Signal overview -->
+      <div class="g4">
+        <div class="mc">
+          <div class="mc-label">Technical Signal</div>
+          <div class="mc-val glow-green" style="font-size:16px">BULLISH</div>
+          <div class="mc-sub">RSI 54 · Above 50MA</div>
+        </div>
+        <div class="mc">
+          <div class="mc-label">IV Rank (IVR)</div>
+          <div class="mc-val glow-blue">34%</div>
+          <div class="mc-sub">IV below avg → favor buying</div>
+        </div>
+        <div class="mc">
+          <div class="mc-label">Put/Call Ratio</div>
+          <div class="mc-val glow-green">0.72</div>
+          <div class="mc-sub">Below 1.0 → bullish skew</div>
+        </div>
+        <div class="mc">
+          <div class="mc-label">30d Realized Vol</div>
+          <div class="mc-val">18.2%</div>
+          <div class="mc-sub">IV premium: +4.2pp</div>
+        </div>
+      </div>
+
+      <!-- Options chain signals -->
+      <div class="card">
+        <div class="card-title">Options Chain — Signal Recommendations (Nearest Monthly Expiry)</div>
+        <table class="dt">
+          <thead>
+            <tr>
+              <th>Type</th><th>Strike</th><th>Expiry</th><th class="num">Delta</th><th class="num">IV</th>
+              <th class="num">Premium</th><th>Signal</th><th>Confidence</th><th>Rationale</th>
+            </tr>
+          </thead>
+          <tbody id="options-tbody">
+            <!-- Populated by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Strategy grid -->
+      <div class="g2">
+        <div class="card">
+          <div class="card-title">Top Strategies (Current Environment)</div>
+          <table class="dt">
+            <thead><tr><th>Strategy</th><th>Signal</th><th>Reason</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>Covered Call (OTM)</td>
+                <td><span class="signal-badge sb-buy">BUY</span></td>
+                <td style="font-size:11.5px;color:var(--text2)">Low IVR; sell premium above $115 strike</td>
+              </tr>
+              <tr>
+                <td>Bull Call Spread</td>
+                <td><span class="signal-badge sb-buy">BUY</span></td>
+                <td style="font-size:11.5px;color:var(--text2)">$108/$115 spread; defined risk long exposure</td>
+              </tr>
+              <tr>
+                <td>Cash-Secured Put</td>
+                <td><span class="signal-badge sb-buy">BUY</span></td>
+                <td style="font-size:11.5px;color:var(--text2)">Sell $105 put; 3.7% premium, strong support</td>
+              </tr>
+              <tr>
+                <td>Long Put (Hedge)</td>
+                <td><span class="signal-badge sb-hold">HOLD</span></td>
+                <td style="font-size:11.5px;color:var(--text2)">Low IVR makes puts cheap; consider protective $100p</td>
+              </tr>
+              <tr>
+                <td>Naked Short Put</td>
+                <td><span class="signal-badge sb-sell">AVOID</span></td>
+                <td style="font-size:11.5px;color:var(--text2)">Guyana arbitration is binary risk event</td>
+              </tr>
+              <tr>
+                <td>Straddle / Strangle</td>
+                <td><span class="signal-badge sb-sell">AVOID</span></td>
+                <td style="font-size:11.5px;color:var(--text2)">IV too low; vol sellers favor; long vol loses</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-title">Key Risk Events (Options Impact)</div>
+          <table class="dt">
+            <thead><tr><th>Event</th><th>Date</th><th>Exp. IV Move</th><th>Direction</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>Q1 Earnings</td>
+                <td>Apr 25</td>
+                <td class="num">±4.5%</td>
+                <td><span class="signal-badge sb-buy">BULLISH</span></td>
+              </tr>
+              <tr>
+                <td>Guyana ROFR Ruling</td>
+                <td>H1 2025</td>
+                <td class="num">±6–9%</td>
+                <td><span class="signal-badge sb-hold">BINARY</span></td>
+              </tr>
+              <tr>
+                <td>OPEC Meeting</td>
+                <td>Jun 1</td>
+                <td class="num">±2.5%</td>
+                <td><span class="signal-badge sb-hold">NEUTRAL</span></td>
+              </tr>
+              <tr>
+                <td>Yellowtail ramp data</td>
+                <td>Q2 2025</td>
+                <td class="num">±3.0%</td>
+                <td><span class="signal-badge sb-buy">BULLISH</span></td>
+              </tr>
+            </tbody>
+          </table>
+          <div style="margin-top:12px;padding:10px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:8px;font-size:11px;color:var(--neon3)">
+            ⚠️ <strong>Disclaimer:</strong> Signals are AI-generated for educational purposes only and do not constitute financial advice. Options trading involves substantial risk of loss. Always consult a licensed financial advisor.
+          </div>
+        </div>
+      </div>
+
+      <!-- ── QUANT ENGINE ──────────────────────────────────────────── -->
+      <div class="card" style="border-color:rgba(0,212,255,.2);box-shadow:0 0 30px rgba(0,212,255,.06)">
+        <div class="card-title" style="color:var(--neon)">⚡ Quantitative Edge Engine — Live Calculator</div>
+        <div class="g3" style="margin-bottom:18px">
+          <div>
+            <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:4px">STOCK PRICE (S)</label>
+            <input id="q-S" type="number" value="108.42" step="0.01" style="width:100%;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);color:var(--text1);border-radius:8px;padding:8px 10px;font-size:13px;font-family:var(--mono);outline:none">
+          </div>
+          <div>
+            <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:4px">STRIKE (K)</label>
+            <input id="q-K" type="number" value="110" step="0.5" style="width:100%;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);color:var(--text1);border-radius:8px;padding:8px 10px;font-size:13px;font-family:var(--mono);outline:none">
+          </div>
+          <div>
+            <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:4px">DAYS TO EXPIRY (T)</label>
+            <input id="q-T" type="number" value="38" step="1" style="width:100%;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);color:var(--text1);border-radius:8px;padding:8px 10px;font-size:13px;font-family:var(--mono);outline:none">
+          </div>
+          <div>
+            <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:4px">IMPLIED VOL σ (%)</label>
+            <input id="q-IV" type="number" value="20.1" step="0.1" style="width:100%;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);color:var(--text1);border-radius:8px;padding:8px 10px;font-size:13px;font-family:var(--mono);outline:none">
+          </div>
+          <div>
+            <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:4px">RISK-FREE RATE r (%)</label>
+            <input id="q-r" type="number" value="5.3" step="0.1" style="width:100%;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);color:var(--text1);border-radius:8px;padding:8px 10px;font-size:13px;font-family:var(--mono);outline:none">
+          </div>
+          <div>
+            <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:4px">DIV YIELD q (%)</label>
+            <input id="q-q" type="number" value="3.66" step="0.01" style="width:100%;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);color:var(--text1);border-radius:8px;padding:8px 10px;font-size:13px;font-family:var(--mono);outline:none">
+          </div>
+        </div>
+        <button onclick="runQuant()" style="background:linear-gradient(135deg,#00d4ff,#7c3aed);color:#fff;border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:18px;box-shadow:0 0 18px rgba(0,212,255,.3)">▶ Run Quant Models</button>
+
+        <!-- BS Results -->
+        <div id="q-results" style="display:none">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--neon);margin-bottom:10px">Black-Scholes (Merton) Results</div>
+          <div class="g4" style="margin-bottom:18px">
+            <div class="mc"><div class="mc-label">Call Price</div><div class="mc-val glow-green" id="r-call">—</div><div class="mc-sub">C = S·e⁻ᵍᵀN(d₁) − K·e⁻ʳᵀN(d₂)</div></div>
+            <div class="mc"><div class="mc-label">Put Price</div><div class="mc-val glow-blue" id="r-put">—</div><div class="mc-sub">P = K·e⁻ʳᵀN(−d₂) − S·e⁻ᵍᵀN(−d₁)</div></div>
+            <div class="mc"><div class="mc-label">Δ Call / Put</div><div class="mc-val" id="r-delta">—</div><div class="mc-sub">dP/dS · sensitivity</div></div>
+            <div class="mc"><div class="mc-label">Γ Gamma</div><div class="mc-val" id="r-gamma">—</div><div class="mc-sub">d²P/dS² · curvature</div></div>
+          </div>
+          <div class="g4" style="margin-bottom:18px">
+            <div class="mc"><div class="mc-label">Θ Theta (per day)</div><div class="mc-val glow-red" id="r-theta">—</div><div class="mc-sub">Time decay cost</div></div>
+            <div class="mc"><div class="mc-label">ν Vega (per 1% IV)</div><div class="mc-val" id="r-vega">—</div><div class="mc-sub">IV sensitivity</div></div>
+            <div class="mc"><div class="mc-label">Prob. ITM (Call)</div><div class="mc-val glow-blue" id="r-pitm">—</div><div class="mc-sub">N(d₂) risk-neutral</div></div>
+            <div class="mc"><div class="mc-label">Expected Move ±</div><div class="mc-val" id="r-em">—</div><div class="mc-sub">σ√T · 1-SD range</div></div>
+          </div>
+
+          <!-- Kelly Criterion -->
+          <div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--neon3);margin-bottom:10px">Kelly Criterion — Optimal Position Sizing</div>
+          <div class="g4" style="margin-bottom:18px">
+            <div class="mc"><div class="mc-label">Win Probability (p)</div><div class="mc-val" id="r-kp">—</div><div class="mc-sub">P(ITM) at expiry</div></div>
+            <div class="mc"><div class="mc-label">Win/Loss Ratio (b)</div><div class="mc-val" id="r-kb">—</div><div class="mc-sub">(Max gain) / Premium paid</div></div>
+            <div class="mc"><div class="mc-label">Full Kelly %</div><div class="mc-val glow-green" id="r-kf">—</div><div class="mc-sub">f* = (bp − q) / b</div></div>
+            <div class="mc"><div class="mc-label">Half Kelly % (safer)</div><div class="mc-val glow-blue" id="r-kh">—</div><div class="mc-sub">Recommended: f*/2</div></div>
+          </div>
+
+          <!-- Monte Carlo -->
+          <div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--neon2);margin-bottom:10px">Monte Carlo Simulation (10,000 paths · GBM)</div>
+          <div class="g4" style="margin-bottom:12px">
+            <div class="mc"><div class="mc-label">Median Final Price</div><div class="mc-val" id="mc-med">—</div></div>
+            <div class="mc"><div class="mc-label">5th Percentile</div><div class="mc-val glow-red" id="mc-p5">—</div></div>
+            <div class="mc"><div class="mc-label">95th Percentile</div><div class="mc-val glow-green" id="mc-p95">—</div></div>
+            <div class="mc"><div class="mc-label">P(Call Profitable)</div><div class="mc-val glow-blue" id="mc-pp">—</div></div>
+          </div>
+          <div style="margin-bottom:18px">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:6px">Price distribution at expiry (histogram)</div>
+            <div id="mc-hist" style="display:flex;align-items:flex-end;gap:2px;height:60px;background:rgba(255,255,255,.02);border-radius:8px;padding:6px"></div>
+            <div style="display:flex;justify-content:space-between;margin-top:4px">
+              <span id="mc-hist-min" style="font-size:10px;color:var(--text3);font-family:var(--mono)"></span>
+              <span style="font-size:10px;color:var(--text3)">Monte Carlo Expiry Distribution</span>
+              <span id="mc-hist-max" style="font-size:10px;color:var(--text3);font-family:var(--mono)"></span>
+            </div>
+          </div>
+
+          <!-- EV & Risk/Reward -->
+          <div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--red2);margin-bottom:10px">Expected Value &amp; Risk/Reward</div>
+          <div class="g4" style="margin-bottom:18px">
+            <div class="mc"><div class="mc-label">EV (Call Long)</div><div class="mc-val" id="ev-call">—</div><div class="mc-sub">E[payoff] − premium</div></div>
+            <div class="mc"><div class="mc-label">EV (Put Long)</div><div class="mc-val" id="ev-put">—</div><div class="mc-sub">E[payoff] − premium</div></div>
+            <div class="mc"><div class="mc-label">Max Loss (Long)</div><div class="mc-val glow-red" id="ev-ml">—</div><div class="mc-sub">Premium paid</div></div>
+            <div class="mc"><div class="mc-label">Breakeven (Call)</div><div class="mc-val" id="ev-be">—</div><div class="mc-sub">Strike + Premium</div></div>
+          </div>
+
+          <!-- Sharpe / Edge -->
+          <div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--green);margin-bottom:10px">Edge Analysis — Signal Composite</div>
+          <div id="edge-bars" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
+          <div id="q-verdict" style="padding:14px;border-radius:10px;font-size:13px;font-weight:600;border:1px solid"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── CHAT ────────────────────────────────────── -->
+    <div class="view" id="view-chat" style="padding:0;gap:0;">
+      <div class="chat-wrap">
+        <div class="chat-suggestions" id="chips">
+          <div class="chip">Guyana strategy deep-dive</div>
+          <div class="chip">Pioneer acquisition impact</div>
+          <div class="chip">XOM vs CVX — which to buy?</div>
+          <div class="chip">Dividend &amp; buyback outlook</div>
+          <div class="chip">Energy transition positioning</div>
+          <div class="chip">2025 earnings catalyst</div>
+          <div class="chip">Options trade ideas</div>
+        </div>
+        <div class="chat-msgs" id="chat-msgs">
+          <div class="msg agent">
+            <div class="msg-av av-agent">X</div>
+            <div>
+              <div class="msg-bub">
+                <p>Welcome to <strong>XOM Expert</strong> — your AI analyst specializing exclusively in ExxonMobil Corporation.</p>
+                <p>I can help with:
+                <ul>
+                  <li>Business segments, key assets &amp; Guyana deep-dives</li>
+                  <li>Financials, FCF, ROCE &amp; capital allocation</li>
+                  <li>Options strategies &amp; risk events</li>
+                  <li>Peer comparisons (XOM vs CVX, SHEL, TTE)</li>
+                  <li>Low Carbon Solutions &amp; energy transition</li>
+                </ul>
+                </p>
+                <p>Ask me anything about ExxonMobil. 🛢️</p>
+              </div>
+              <div class="msg-time">XOM Expert · Ready</div>
+            </div>
+          </div>
+        </div>
+        <div class="chat-input-row">
+          <textarea class="chat-input" id="chat-input" rows="1" placeholder="Ask about ExxonMobil…"></textarea>
+          <button class="btn-send" id="btn-send">Send ↑</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SEGMENTS ────────────────────────────────── -->
+    <div class="view" id="view-segments">
+      <div class="ph"><div><div class="ph-title">Business Segments</div><div class="ph-sub">Four integrated segments across the energy value chain</div></div></div>
+      <div class="g2">
+        <div class="card">
+          <div class="card-title">Earnings Contribution 2024E</div>
+          <div class="seg-row">
+            <div class="seg-hd"><span class="seg-name">⛽ Upstream (E&P)</span><span class="seg-pct">52%</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:52%;background:linear-gradient(90deg,#e31837,#ff6b6b)"></div></div>
+            <div style="font-size:11px;color:var(--text3)">Permian, Guyana, LNG — 4.3 Moebd</div>
+          </div>
+          <div class="seg-row">
+            <div class="seg-hd"><span class="seg-name">🏭 Energy Products</span><span class="seg-pct">24%</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:24%;background:linear-gradient(90deg,#f59e0b,#fbbf24)"></div></div>
+            <div style="font-size:11px;color:var(--text3)">Refining &amp; fuels; 4.6 Mbd capacity</div>
+          </div>
+          <div class="seg-row">
+            <div class="seg-hd"><span class="seg-name">🧪 Chemical Products</span><span class="seg-pct">14%</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:14%;background:linear-gradient(90deg,#00d4ff,#7c3aed)"></div></div>
+            <div style="font-size:11px;color:var(--text3)">Olefins, polyolefins, aromatics</div>
+          </div>
+          <div class="seg-row">
+            <div class="seg-hd"><span class="seg-name">✨ Specialty Products</span><span class="seg-pct">10%</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:10%;background:linear-gradient(90deg,#00ff88,#10b981)"></div></div>
+            <div style="font-size:11px;color:var(--text3)">Mobil 1, basestocks, waxes</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Segment Financials ($B, 2024)</div>
+          <table class="dt">
+            <thead><tr><th>Segment</th><th class="num">Earnings</th><th class="num">ROCE</th></tr></thead>
+            <tbody>
+              <tr><td>Upstream</td><td class="num up">$17.6</td><td class="num up">18.4%</td></tr>
+              <tr><td>Energy Products</td><td class="num">$8.1</td><td class="num">9.8%</td></tr>
+              <tr><td>Chemical Products</td><td class="num">$4.7</td><td class="num">11.2%</td></tr>
+              <tr><td>Specialty Products</td><td class="num up">$3.3</td><td class="num up">22.1%</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ASSETS ──────────────────────────────────── -->
+    <div class="view" id="view-assets">
+      <div class="ph"><div><div class="ph-title">Key Assets</div><div class="ph-sub">ExxonMobil's highest-value upstream positions</div></div></div>
+      <div class="asset-grid">
+        <div class="ac"><div class="ac-name">Permian Basin</div><div class="ac-region">🇺🇸 USA — Midland + Delaware</div><div class="ac-stat">Production: <strong>~1.24 Moebd</strong></div><div class="ac-stat">Net Acres (post-Pioneer): <strong>~1.4M</strong></div><div class="ac-stat">2030 Target: <strong>2.3 Moebd</strong></div></div>
+        <div class="ac"><div class="ac-name">Stabroek Block (Guyana)</div><div class="ac-region">🇬🇾 Offshore</div><div class="ac-stat">Discovered resource: <strong>11+ Bboe</strong></div><div class="ac-stat">XOM WI: <strong>45% (operator)</strong></div><div class="ac-stat">Active FPSOs: <strong>4 (Destiny, Unity, Payara, Yellowtail)</strong></div></div>
+        <div class="ac"><div class="ac-name">PNG LNG</div><div class="ac-region">🇵🇬 Papua New Guinea</div><div class="ac-stat">Capacity: <strong>8.3 Mtpa</strong></div><div class="ac-stat">XOM WI: <strong>33.2%</strong></div></div>
+        <div class="ac"><div class="ac-name">Mozambique (Coral FLNG)</div><div class="ac-region">🇲🇿 Offshore Area 4</div><div class="ac-stat">FLNG Capacity: <strong>3.4 Mtpa</strong></div><div class="ac-stat">XOM WI: <strong>25%</strong></div><div class="ac-stat">Status: <strong>Operational since 2022</strong></div></div>
+        <div class="ac"><div class="ac-name">Gulf of Mexico Deepwater</div><div class="ac-region">🌊 USA — GoM</div><div class="ac-stat">Key fields: <strong>Hadrian, Julia</strong></div><div class="ac-stat">Net production: <strong>~200 koebd</strong></div></div>
+        <div class="ac"><div class="ac-name">Baytown / Beaumont</div><div class="ac-region">🏭 Texas Gulf Coast</div><div class="ac-stat">Baytown: <strong>588 kbd</strong></div><div class="ac-stat">Beaumont (expanded 2023): <strong>369 kbd</strong></div><div class="ac-stat">Also: <strong>Bayou Bend CCS hub</strong></div></div>
+      </div>
+    </div>
+
+    <!-- ── LOW CARBON ──────────────────────────────── -->
+    <div class="view" id="view-lowcarbon">
+      <div class="ph"><div><div class="ph-title">Low Carbon Solutions</div><div class="ph-sub">ExxonMobil's energy transition strategy and 2030 targets</div></div></div>
+      <div class="g2">
+        <div class="card">
+          <div class="card-title">Initiatives &amp; Targets</div>
+          <table class="dt">
+            <thead><tr><th>Initiative</th><th>Target / Status</th></tr></thead>
+            <tbody>
+              <tr><td>CCS Storage</td><td>&gt;10 Mtpa CO₂ by 2030</td></tr>
+              <tr><td>Blue Hydrogen</td><td>Gulf Coast hub; FID pending</td></tr>
+              <tr><td>Lithium (DLE)</td><td>100,000 t/y by 2030; Smackover, AR</td></tr>
+              <tr><td>Biofuels</td><td>Carinata renewable diesel + SAF</td></tr>
+              <tr><td>Proxxima™ Recycling</td><td>Advanced plastic recycling tech</td></tr>
+              <tr><td>Net-Zero Scope 1+2</td><td>Target: 2050 (operated assets)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-title">Revenue Opportunity ($B by 2030)</div>
+          <div class="seg-row" style="margin-top:8px">
+            <div class="seg-hd"><span class="seg-name">CCS &amp; H₂</span><span class="seg-pct">~$3B</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:60%;background:linear-gradient(90deg,#00ff88,#10b981)"></div></div>
+          </div>
+          <div class="seg-row">
+            <div class="seg-hd"><span class="seg-name">Lithium</span><span class="seg-pct">~$1B</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:20%;background:linear-gradient(90deg,#f59e0b,#fbbf24)"></div></div>
+          </div>
+          <div class="seg-row">
+            <div class="seg-hd"><span class="seg-name">Biofuels</span><span class="seg-pct">~$0.5B</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:10%;background:linear-gradient(90deg,#00d4ff,#7c3aed)"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CATALYSTS ───────────────────────────────── -->
+    <div class="view" id="view-catalysts">
+      <div class="ph"><div><div class="ph-title">Key Catalysts &amp; Timeline</div><div class="ph-sub">Upcoming events and completed milestones</div></div></div>
+      <div class="g2">
+        <div class="card">
+          <div class="card-title">Completed</div>
+          <div class="tl">
+            <div class="tl-item"><div class="tl-dot done">✓</div><div class="tl-body"><div class="tl-title">Pioneer Acquisition Closes</div><div class="tl-date">October 2024</div><div class="tl-desc">$60B deal. XOM becomes #1 Permian operator.</div></div></div>
+            <div class="tl-item"><div class="tl-dot done">✓</div><div class="tl-body"><div class="tl-title">Yellowtail FPSO First Oil</div><div class="tl-date">Q4 2024</div><div class="tl-desc">4th Guyana FPSO; 250 kbd nameplate.</div></div></div>
+            <div class="tl-item"><div class="tl-dot done">✓</div><div class="tl-body"><div class="tl-title">Beaumont Refinery Expansion</div><div class="tl-date">2023</div><div class="tl-desc">Largest US refinery expansion in a decade.</div></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Upcoming</div>
+          <div class="tl">
+            <div class="tl-item"><div class="tl-dot">🗓</div><div class="tl-body"><div class="tl-title">Guyana ROFR Arbitration Ruling</div><div class="tl-date" style="color:var(--red2)">⚠️ H1 2025 · Binary risk</div><div class="tl-desc">XOM ROFR on Hess's 30% Stabroek stake (Chevron deal). Could reshape block ownership.</div></div></div>
+            <div class="tl-item"><div class="tl-dot">🗓</div><div class="tl-body"><div class="tl-title">Hammerhead FPSO FID</div><div class="tl-date">2025</div><div class="tl-desc">5th Guyana FPSO; 200+ kbd; first oil ~2029.</div></div></div>
+            <div class="tl-item"><div class="tl-dot">🗓</div><div class="tl-body"><div class="tl-title">Lithium Commercial Launch</div><div class="tl-date">2026–2027</div><div class="tl-desc">First sales from Smackover DLE project.</div></div></div>
+            <div class="tl-item"><div class="tl-dot">🗓</div><div class="tl-body"><div class="tl-title">Bayou Bend CCS Operations</div><div class="tl-date">2026–2028</div><div class="tl-desc">First CCS revenue; validates Low Carbon business model.</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── Navigation ─────────────────────────────────────────────────
+document.querySelectorAll('.nav-item').forEach(item=>{
+  item.addEventListener('click',()=>{
+    const t=item.dataset.view;
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById('view-'+t).classList.add('active');
+  });
+});
+
+// ── Clock ───────────────────────────────────────────────────────
+function tick(){
+  const ny=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  const t=ny.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});
+  const h=ny.getHours(),m=ny.getMinutes();
+  const open=(h>9||(h===9&&m>=30))&&h<16;
+  document.getElementById('t-time').textContent=t+' ET · '+(open?'🟢 Open':'🔴 Closed');
+}
+tick();setInterval(tick,1000);
+
+// ── Live ticker drift ───────────────────────────────────────────
+let price=108.42,iv=22.4;
+setInterval(()=>{
+  price=Math.max(100,Math.min(118,price+(Math.random()-.49)*.22));
+  iv=Math.max(18,Math.min(30,iv+(Math.random()-.5)*.15));
+  const base=107.18,chg=price-base,pct=(chg/base*100);
+  document.getElementById('t-price').textContent='$'+price.toFixed(2);
+  const el=document.getElementById('t-chg');
+  el.textContent=(chg>=0?'▲ +':'▼ ')+Math.abs(chg).toFixed(2)+' ('+(chg>=0?'+':'')+pct.toFixed(2)+'%)';
+  el.className='tick-chg '+(chg>=0?'up':'dn');
+  document.getElementById('t-iv').textContent=iv.toFixed(1)+'%';
+},3200);
+
+// ── Sparkline ───────────────────────────────────────────────────
+(()=>{
+  const vals=[102.1,103.4,101.8,104.2,103.9,105.1,104.6,106.8,105.3,107.2,106.4,108.0,107.6,108.9,108.1,109.4,108.7,107.9,109.2,110.1,109.4,108.8,110.2,111.0,110.5,109.8,111.3,110.8,109.6,108.42];
+  const min=Math.min(...vals),max=Math.max(...vals),rng=max-min;
+  const c=document.getElementById('sparkline');
+  vals.forEach(v=>{
+    const b=document.createElement('div');
+    b.className='sp-bar';
+    b.style.height=((v-min)/rng*100)+'%';
+    b.title='$'+v.toFixed(2);
+    c.appendChild(b);
+  });
+})();
+
+// ── Options chain data ──────────────────────────────────────────
+const optionsData=[
+  {type:'CALL',strike:105,exp:'Apr 17',delta:0.72,iv:'19.4%',prem:'$4.20',signal:'BUY',conf:5,rationale:'Deep ITM; strong delta; momentum behind it'},
+  {type:'CALL',strike:110,exp:'Apr 17',delta:0.48,iv:'20.1%',prem:'$2.10',signal:'BUY',conf:4,rationale:'ATM; best risk/reward for directional play'},
+  {type:'CALL',strike:115,exp:'Apr 17',delta:0.24,iv:'21.3%',prem:'$0.85',signal:'BUY',conf:3,rationale:'OTM lotto; Q1 earnings catalyst potential'},
+  {type:'CALL',strike:120,exp:'Apr 17',delta:0.10,iv:'22.8%',prem:'$0.30',signal:'HOLD',conf:2,rationale:'Low probability; only on strong breakout'},
+  {type:'PUT',strike:105,exp:'Apr 17',delta:-0.28,iv:'20.9%',prem:'$1.60',signal:'SELL',conf:4,rationale:'Sell to open (CSP); $105 is strong support zone'},
+  {type:'PUT',strike:100,exp:'Apr 17',delta:-0.12,iv:'22.4%',prem:'$0.65',signal:'SELL',conf:4,rationale:'Deep OTM; high probability; collect premium'},
+  {type:'PUT',strike:95,exp:'Apr 17',delta:-0.05,iv:'24.1%',prem:'$0.25',signal:'HOLD',conf:3,rationale:'Tail risk hedge only; very low probability'},
+  {type:'CALL',strike:110,exp:'Jun 20',delta:0.45,iv:'20.8%',prem:'$3.40',signal:'BUY',conf:5,rationale:'Best time decay ratio; Guyana catalyst window'},
+];
+
+const tbody=document.getElementById('options-tbody');
+optionsData.forEach(o=>{
+  const tr=document.createElement('tr');
+  const sigClass=o.signal==='BUY'?'sb-buy':o.signal==='SELL'?'sb-sell':'sb-hold';
+  const c=o.conf;
+  const bars='<div class="conf-bar c'+c+'">'+Array(5).fill('<span></span>').join('')+'</div>';
+  tr.innerHTML=`
+    <td style="color:${o.type==='CALL'?'var(--green)':'var(--red2)'};font-weight:700">${o.type}</td>
+    <td style="font-family:var(--mono);font-weight:700">$${o.strike}</td>
+    <td style="font-size:11px;color:var(--text3)">${o.exp}</td>
+    <td class="num" style="color:${o.delta>0?'var(--green)':'var(--red2)'}">${o.delta.toFixed(2)}</td>
+    <td class="num">${o.iv}</td>
+    <td class="num" style="color:var(--neon);font-family:var(--mono)">${o.prem}</td>
+    <td><span class="signal-badge ${sigClass}">${o.signal}</span></td>
+    <td>${bars}</td>
+    <td style="font-size:11px;color:var(--text2)">${o.rationale}</td>
+  `;
+  tbody.appendChild(tr);
+});
+
+// ── Chat knowledge base ─────────────────────────────────────────
+const KB={
+  guyana:`**Guyana — Stabroek Block Deep Dive**\n\nXOM (45% WI, operator) has discovered **11+ billion barrels** of recoverable resource — one of the largest offshore discoveries of the century.\n\n**Active FPSOs:**\n- Liza Destiny (~120 kbd)\n- Liza Unity (~220 kbd)\n- Payara (~220 kbd)\n- Yellowtail (~250 kbd, Q4 2024 first oil)\n\n**Next:** Hammerhead FPSO — FID targeted 2025, first oil ~2029 (200+ kbd).\n\n**⚠️ Key risk:** Hess/Chevron merger arbitration. XOM claims ROFR on Hess's 30% stake. Ruling expected H1 2025 — a binary event for XOM's Guyana control.`,
+
+  pioneer:`**Pioneer Acquisition — $60B Permian Bet**\n\nCompleted October 2024. XOM's largest deal since the 1999 Mobil merger.\n\n**What XOM gained:**\n- ~700,000 net additional Permian acres (Midland sub-basin)\n- ~300 koebd of production immediately\n- #1 Permian operator status by acreage\n- ~$3B/yr targeted synergies\n\n**2030 vision:** Permian target raised to **2.3 Moebd** — the single largest earnings driver in XOM's history.`,
+
+  dividend:`**Dividend & Buyback Profile**\n\nXOM is a **Dividend Aristocrat** — 42+ consecutive years of increases.\n\n- **Quarterly dividend:** $0.99/share ($3.96 annualized)\n- **Yield:** ~3.6–4.0%\n- **Buyback program:** Up to $20B/year (expanded 2024)\n\n**Outlook:** Pioneer synergies support continued dividend growth through 2026+. Buyback yield of ~4.4% provides total shareholder return of ~8% even without price appreciation.`,
+
+  cvx:`**XOM vs CVX — Investment Comparison**\n\n| Metric | XOM | CVX |\n|--------|-----|-----|\n| Market Cap | ~$459B | ~$270B |\n| P/E (NTM) | 12.2x | 13.1x |\n| Div. Yield | 3.7% | 4.3% |\n| ROCE | 13.2% | 11.8% |\n| Net Debt | $13.6B | $18.2B |\n\n**XOM advantages:** Larger, lower valuation multiple, better ROCE, Pioneer Permian dominance, Guyana control.\n\n**CVX advantages:** Higher dividend yield, Tengiz expansion, simpler portfolio.\n\n**Analyst view:** XOM edges out on growth trajectory and ROCE through 2030.`,
+
+  options:`**XOM Options Analysis**\n\nCurrent environment favors **premium selling** and **defined-risk bullish strategies**:\n\n**Top strategies:**\n- **Covered Call:** Sell OTM calls ($115–$118 strike); low IVR environment favors stock-holding with premium income\n- **Cash-Secured Put:** Sell $105 put; 3.7% premium, strong technical support\n- **Bull Call Spread:** $108/$115 spread; limited risk bullish exposure into Q1 earnings\n\n**Watch for:** Guyana ROFR ruling is a binary event — consider hedging via protective put ahead of ruling.\n\n**IV context:** IVR at 34% means IV is below average → favor buying options over selling (except near $105 support).`,
+
+  transition:`**XOM Energy Transition Strategy**\n\nXOM's approach: pragmatic, fossil-fuel-first, with selective low-carbon bets:\n\n**1. CCS:** Bayou Bend hub (GoM) — 1B+ tonnes potential storage. Target >10 Mtpa by 2030.\n**2. Blue Hydrogen:** Gulf Coast hub; FID pending.\n**3. Lithium:** DLE from Smackover brine, Arkansas. Target 100,000 t/y by 2030 (enough for ~1M EVs).\n**4. Biofuels:** Carinata-based renewable diesel + SAF.\n**5. Proxxima™:** Advanced plastic recycling technology.\n\n**XOM's view:** Oil and gas remain critical through 2050. Low Carbon builds incremental upside, not a replacement.`,
+
+  earnings:`**2025 Earnings Outlook**\n\nConsensus (as of early 2026):\n- **EPS (adj.):** ~$8.90 (+3% YoY)\n- **FCF:** ~$33B (including ~$2B Pioneer synergies)\n- **CapEx guided:** $27–29B\n\n**Upside drivers:** Yellowtail ramp, Pioneer synergies, Permian growth.\n**Downside risks:** Brent below $70 (sensitivity: ~$500M per $1), Guyana arbitration, crack spread compression.\n\nXOM has guided for $20B/yr buybacks — signaling confidence in sustained FCF even at lower oil prices.`
+};
+
+function botReply(t){
+  const l=t.toLowerCase();
+  if(l.includes('guyana')||l.includes('stabroek')||l.includes('fpso')) return KB.guyana;
+  if(l.includes('pioneer')||l.includes('permian')) return KB.pioneer;
+  if(l.includes('dividend')||l.includes('yield')||l.includes('buyback')) return KB.dividend;
+  if(l.includes('cvx')||l.includes('chevron')||l.includes('compare')||l.includes('vs')||l.includes('better')||l.includes('buy')) return KB.cvx;
+  if(l.includes('option')||l.includes('call')||l.includes('put')||l.includes('trade')) return KB.options;
+  if(l.includes('carbon')||l.includes('ccs')||l.includes('lithium')||l.includes('hydrogen')||l.includes('transition')) return KB.transition;
+  if(l.includes('earnings')||l.includes('eps')||l.includes('2025')||l.includes('fcf')||l.includes('outlook')) return KB.earnings;
+  return `I can answer questions about:\n- **Guyana / Stabroek strategy**\n- **Pioneer acquisition & Permian**\n- **Dividend & buyback outlook**\n- **XOM vs CVX comparison**\n- **Options strategies for XOM**\n- **Energy transition & Low Carbon**\n- **2025 earnings outlook**\n\nConnect to the OpenClaw XOM Expert plugin for deeper AI-powered responses on any topic.`;
+}
+
+function md(s){
+  return s
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\n\n/g,'</p><p>')
+    .replace(/\n- /g,'<li>')
+    .replace(/\n/g,'<br>');
+}
+
+function addMsg(role,text){
+  const c=document.getElementById('chat-msgs');
+  const div=document.createElement('div');
+  div.className='msg '+role;
+  const t=new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+  div.innerHTML=`<div class="msg-av ${role==='agent'?'av-agent':'av-user'}">${role==='agent'?'X':'U'}</div><div><div class="msg-bub"><p>${md(text)}</p></div><div class="msg-time">${role==='agent'?'XOM Expert':'You'} · ${t}</div></div>`;
+  c.appendChild(div);c.scrollTop=c.scrollHeight;
+}
+
+function showTyping(){
+  const c=document.getElementById('chat-msgs');
+  const div=document.createElement('div');
+  div.id='typing';div.className='msg agent';
+  div.innerHTML='<div class="msg-av av-agent">X</div><div class="msg-bub"><div class="typing-dots"><span></span><span></span><span></span></div></div>';
+  c.appendChild(div);c.scrollTop=c.scrollHeight;
+}
+
+function send(){
+  const inp=document.getElementById('chat-input');
+  const txt=inp.value.trim();if(!txt)return;
+  document.getElementById('chips').style.display='none';
+  inp.value='';inp.style.height='auto';
+  addMsg('user',txt);
+  showTyping();
+  setTimeout(()=>{
+    const t=document.getElementById('typing');if(t)t.remove();
+    addMsg('agent',botReply(txt));
+  },700+Math.random()*600);
+}
+
+document.getElementById('btn-send').addEventListener('click',send);
+document.getElementById('chat-input').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}
+});
+document.getElementById('chat-input').addEventListener('input',function(){
+  this.style.height='auto';
+  this.style.height=Math.min(this.scrollHeight,140)+'px';
+});
+document.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>{
+  document.getElementById('chat-input').value=c.textContent;send();
+}));
+
+// ── Quant Engine ────────────────────────────────────────────────
+// Standard normal CDF (Abramowitz & Stegun approximation — accurate to 7 sig figs)
+function normCDF(x){
+  const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+  const sign=x<0?-1:1; const t=1/(1+p*Math.abs(x)/Math.SQRT2);
+  const poly=((((a5*t+a4)*t+a3)*t+a2)*t+a1)*t;
+  return 0.5*(1+sign*(1-poly*Math.exp(-x*x/2)));
+}
+function normPDF(x){return Math.exp(-0.5*x*x)/Math.sqrt(2*Math.PI)}
+
+// Black-Scholes-Merton (with continuous dividend yield q)
+function bsm(S,K,T,sigma,r,q){
+  if(T<=0) return {call:Math.max(S-K,0),put:Math.max(K-S,0),d1:0,d2:0};
+  const sqT=Math.sqrt(T);
+  const d1=(Math.log(S/K)+(r-q+0.5*sigma*sigma)*T)/(sigma*sqT);
+  const d2=d1-sigma*sqT;
+  const call=S*Math.exp(-q*T)*normCDF(d1)-K*Math.exp(-r*T)*normCDF(d2);
+  const put=K*Math.exp(-r*T)*normCDF(-d2)-S*Math.exp(-q*T)*normCDF(-d1);
+  return {call,put,d1,d2};
+}
+
+// Greeks
+function greeks(S,K,T,sigma,r,q,d1,d2){
+  const sqT=Math.sqrt(T);
+  const deltaCall=Math.exp(-q*T)*normCDF(d1);
+  const deltaPut=deltaCall-Math.exp(-q*T);
+  const gamma=Math.exp(-q*T)*normPDF(d1)/(S*sigma*sqT);
+  const vega=S*Math.exp(-q*T)*normPDF(d1)*sqT/100; // per 1% change in vol
+  const thetaCall=(-S*normPDF(d1)*sigma*Math.exp(-q*T)/(2*sqT)
+    -r*K*Math.exp(-r*T)*normCDF(d2)+q*S*Math.exp(-q*T)*normCDF(d1))/365;
+  const thetaPut=(-S*normPDF(d1)*sigma*Math.exp(-q*T)/(2*sqT)
+    +r*K*Math.exp(-r*T)*normCDF(-d2)-q*S*Math.exp(-q*T)*normCDF(-d1))/365;
+  return {deltaCall,deltaPut,gamma,vega,thetaCall,thetaPut};
+}
+
+// Monte Carlo GBM (n paths, returns sorted final prices)
+function monteCarlo(S,T,sigma,r,q,n=10000){
+  const dt=T,mu=(r-q-0.5*sigma*sigma)*dt;
+  const sigsqdt=sigma*Math.sqrt(dt);
+  const prices=new Float64Array(n);
+  for(let i=0;i<n;i++){
+    // Box-Muller for standard normal
+    const u1=Math.random()||1e-12,u2=Math.random();
+    const z=Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2);
+    prices[i]=S*Math.exp(mu+sigsqdt*z);
+  }
+  prices.sort((a,b)=>a-b);
+  return prices;
+}
+
+function pct(arr,p){return arr[Math.floor(p/100*(arr.length-1))]}
+
+// Kelly Criterion: f* = (b*p - (1-p)) / b
+// p = prob of winning, b = win/loss ratio
+function kelly(p,b){
+  if(b<=0||p<=0||p>=1) return 0;
+  return Math.max(0,(b*p-(1-p))/b);
+}
+
+// Edge factors (0–1 scores)
+function edgeScores(S,K,T,sigma,r,q,d2,callPrice){
+  const IVR=0.34; // IV Rank
+  const PCR=0.72; // Put/Call ratio
+  const RSI=54;   // RSI
+  const ivEdge=IVR<0.4?0.7:IVR<0.6?0.5:0.3; // low IVR = buy edge
+  const momentumEdge=RSI>50&&RSI<70?0.75:0.5;
+  const sentimentEdge=PCR<0.8?0.7:PCR<1.0?0.55:0.4;
+  const priceEdge=S>K?0.65:S===K?0.5:0.35; // ITM/ATM/OTM
+  const timeEdge=T>30?0.6:T>14?0.5:0.4;    // enough time
+  return [
+    {label:'IV Rank Edge (IVR 34%)',score:ivEdge,note:'Low IVR → favor buying'},
+    {label:'Price Momentum (RSI 54)',score:momentumEdge,note:'RSI neutral-bullish zone'},
+    {label:'Sentiment (P/C 0.72)',score:sentimentEdge,note:'Bullish skew'},
+    {label:'Moneyness (S vs K)',score:priceEdge,note:S>K?'ITM call — high delta':S===K?'ATM':'OTM — lower probability'},
+    {label:'Time Value ('+T+'d)',score:timeEdge,note:'Days to expiry'},
+  ];
+}
+
+function fmt2(n){return n.toFixed(2)}
+function fmtp(n){return (n*100).toFixed(1)+'%'}
+
+function runQuant(){
+  const S=parseFloat(document.getElementById('q-S').value);
+  const K=parseFloat(document.getElementById('q-K').value);
+  const Td=parseInt(document.getElementById('q-T').value);
+  const IV=parseFloat(document.getElementById('q-IV').value)/100;
+  const r=parseFloat(document.getElementById('q-r').value)/100;
+  const q=parseFloat(document.getElementById('q-q').value)/100;
+
+  if([S,K,Td,IV,r,q].some(isNaN)||Td<=0||IV<=0) return;
+
+  const T=Td/365;
+  const bs=bsm(S,K,T,IV,r,q);
+  const g=greeks(S,K,T,IV,r,q,bs.d1,bs.d2);
+  const expMove=S*IV*Math.sqrt(T);
+  const probITM=normCDF(bs.d2);
+
+  // Display BS
+  document.getElementById('r-call').textContent='$'+fmt2(bs.call);
+  document.getElementById('r-put').textContent='$'+fmt2(bs.put);
+  document.getElementById('r-delta').textContent=fmt2(g.deltaCall)+' / '+fmt2(g.deltaPut);
+  document.getElementById('r-gamma').textContent=fmt2(g.gamma);
+  document.getElementById('r-theta').textContent='−$'+fmt2(Math.abs(g.thetaCall))+'/d';
+  document.getElementById('r-vega').textContent='$'+fmt2(g.vega);
+  document.getElementById('r-pitm').textContent=fmtp(probITM);
+  document.getElementById('r-em').textContent='±$'+fmt2(expMove);
+
+  // Kelly
+  const winRatio=(S+expMove-K)/bs.call; // rough win payoff / premium
+  const kf=kelly(probITM,Math.max(winRatio,0.1));
+  document.getElementById('r-kp').textContent=fmtp(probITM);
+  document.getElementById('r-kb').textContent=fmt2(Math.max(winRatio,0));
+  document.getElementById('r-kf').textContent=fmtp(kf);
+  document.getElementById('r-kh').textContent=fmtp(kf/2);
+
+  // Monte Carlo
+  const paths=monteCarlo(S,T,IV,r,q,10000);
+  const med=pct(paths,50);
+  const p5=pct(paths,5);
+  const p95=pct(paths,95);
+  const profitable=paths.filter(p=>p>K+bs.call).length/paths.length;
+  document.getElementById('mc-med').textContent='$'+fmt2(med);
+  document.getElementById('mc-p5').textContent='$'+fmt2(p5);
+  document.getElementById('mc-p95').textContent='$'+fmt2(p95);
+  document.getElementById('mc-pp').textContent=fmtp(profitable);
+
+  // Histogram
+  const histEl=document.getElementById('mc-hist');
+  histEl.innerHTML='';
+  const bins=50,min=p5*0.97,max=p95*1.03,binW=(max-min)/bins;
+  const counts=new Array(bins).fill(0);
+  paths.forEach(p=>{const b=Math.min(bins-1,Math.floor((p-min)/binW));if(b>=0)counts[b]++;});
+  const cmax=Math.max(...counts);
+  document.getElementById('mc-hist-min').textContent='$'+fmt2(min);
+  document.getElementById('mc-hist-max').textContent='$'+fmt2(max);
+  counts.forEach((c,i)=>{
+    const bar=document.createElement('div');
+    const plo=min+i*binW;
+    const isITM=plo>K;
+    bar.style.cssText='flex:1;border-radius:2px 2px 0 0;min-height:2px;height:'+(c/cmax*100)+'%;'
+      +'background:'+(isITM?'rgba(0,255,136,.6)':'rgba(255,77,109,.4)')+';transition:height .3s';
+    histEl.appendChild(bar);
+  });
+
+  // EV
+  const avgPayoffCall=paths.reduce((s,p)=>s+Math.max(p-K,0),0)/paths.length;
+  const avgPayoffPut=paths.reduce((s,p)=>s+Math.max(K-p,0),0)/paths.length;
+  const evCall=avgPayoffCall*Math.exp(-r*T)-bs.call;
+  const evPut=avgPayoffPut*Math.exp(-r*T)-bs.put;
+  document.getElementById('ev-call').textContent=(evCall>=0?'+':'')+fmt2(evCall);
+  document.getElementById('ev-call').className='mc-val '+(evCall>=0?'glow-green':'glow-red');
+  document.getElementById('ev-put').textContent=(evPut>=0?'+':'')+fmt2(evPut);
+  document.getElementById('ev-put').className='mc-val '+(evPut>=0?'glow-green':'glow-red');
+  document.getElementById('ev-ml').textContent='-$'+fmt2(bs.call);
+  document.getElementById('ev-be').textContent='$'+fmt2(K+bs.call);
+
+  // Edge bars
+  const factors=edgeScores(S,K,T,IV,r,q,bs.d2,bs.call);
+  const edgeEl=document.getElementById('edge-bars');
+  edgeEl.innerHTML='';
+  let totalScore=0;
+  factors.forEach(f=>{
+    totalScore+=f.score;
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;flex-direction:column;gap:3px';
+    const color=f.score>0.65?'var(--green)':f.score>0.45?'var(--neon3)':'var(--red2)';
+    row.innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span style="font-size:11.5px;font-weight:600">${f.label}</span>
+        <span style="font-size:11px;color:${color};font-family:var(--mono)">${(f.score*100).toFixed(0)}%</span>
+      </div>
+      <div style="height:4px;background:rgba(255,255,255,.06);border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:${f.score*100}%;background:${color};border-radius:99px;transition:width .8s"></div>
+      </div>
+      <div style="font-size:10px;color:var(--text3)">${f.note}</div>`;
+    edgeEl.appendChild(row);
+  });
+
+  const composite=totalScore/factors.length;
+  const verdict=document.getElementById('q-verdict');
+  if(composite>0.65){
+    verdict.style.cssText='padding:14px;border-radius:10px;font-size:13px;font-weight:600;border:1px solid rgba(0,255,136,.3);background:rgba(0,255,136,.08);color:var(--green)';
+    verdict.innerHTML='▲ <strong>BULLISH EDGE</strong> — Composite Score: '+(composite*100).toFixed(0)+'/100. Models favor LONG CALL or BULL CALL SPREAD. Kelly suggests '+(kelly(probITM,Math.max(winRatio,0.1))/2*100).toFixed(1)+'% of capital (half-Kelly).';
+  } else if(composite>0.50){
+    verdict.style.cssText='padding:14px;border-radius:10px;font-size:13px;font-weight:600;border:1px solid rgba(245,158,11,.3);background:rgba(245,158,11,.07);color:var(--neon3)';
+    verdict.innerHTML='◆ <strong>NEUTRAL / MODERATE EDGE</strong> — Score: '+(composite*100).toFixed(0)+'/100. Consider defined-risk strategies (spreads, CSP). Reduce position size.';
+  } else {
+    verdict.style.cssText='padding:14px;border-radius:10px;font-size:13px;font-weight:600;border:1px solid rgba(255,77,109,.3);background:rgba(255,77,109,.08);color:var(--red2)';
+    verdict.innerHTML='▼ <strong>WEAK EDGE</strong> — Score: '+(composite*100).toFixed(0)+'/100. Models do not favor this trade setup. Reassess strike/expiry or wait for better conditions.';
+  }
+
+  document.getElementById('q-results').style.display='block';
+}
+
+// Auto-run on load
+window.addEventListener('load',runQuant);
+</script>
+</body>
+</html>
