@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XOM Expert — ExxonMobil Analysis Hub</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --panel: #111827;
+    --border: #1f2d45;
+    --accent: #e84142;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --blue: #3b82f6;
+    --purple: #8b5cf6;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --header-bg: #0d1525;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 13px; }
+
+  /* HEADER */
+  header {
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 36px; height: 36px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 16px; }
+  .logo-text { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+  .logo-sub { font-size: 11px; color: var(--muted); }
+  .header-price { text-align: right; }
+  .price-val { font-size: 28px; font-weight: 800; color: var(--green); }
+  .price-change { font-size: 12px; color: var(--green); }
+  .header-badges { display: flex; gap: 8px; align-items: center; }
+  .badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-green { background: rgba(34,197,94,.15); color: var(--green); border: 1px solid rgba(34,197,94,.3); }
+  .badge-yellow { background: rgba(245,158,11,.15); color: var(--yellow); border: 1px solid rgba(245,158,11,.3); }
+  .badge-red { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+  .badge-blue { background: rgba(59,130,246,.15); color: var(--blue); border: 1px solid rgba(59,130,246,.3); }
+
+  /* NAV TABS */
+  nav { background: var(--header-bg); border-bottom: 1px solid var(--border); padding: 0 20px; display: flex; gap: 0; }
+  .tab { padding: 10px 18px; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; transition: all .2s; letter-spacing: .3px; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* LAYOUT */
+  main { padding: 16px 20px; max-width: 1600px; margin: 0 auto; }
+  .section { display: none; }
+  .section.active { display: block; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .col-span-2 { grid-column: span 2; }
+  .col-span-3 { grid-column: span 3; }
+
+  /* PANEL */
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .panel-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+  .panel-title .dot { width: 6px; height: 6px; border-radius: 50%; }
+
+  /* STAT CARDS */
+  .stat-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 6px; }
+  .stat-value { font-size: 22px; font-weight: 800; }
+  .stat-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  /* SIGNAL METER */
+  .signal-meter { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .meter-bar { flex: 1; height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden; }
+  .meter-fill { height: 100%; border-radius: 4px; transition: width .6s ease; }
+  .meter-label { font-size: 11px; color: var(--muted); min-width: 90px; }
+  .meter-val { font-size: 11px; font-weight: 700; min-width: 36px; text-align: right; }
+
+  /* TRADE CARD */
+  .trade-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 12px; position: relative; overflow: hidden; }
+  .trade-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+  .trade-card.bullish::before { background: var(--green); }
+  .trade-card.bearish::before { background: var(--red); }
+  .trade-card.neutral::before { background: var(--yellow); }
+  .trade-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .trade-name { font-size: 14px; font-weight: 700; }
+  .trade-type { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .trade-prob { font-size: 24px; font-weight: 900; }
+  .trade-prob.high { color: var(--green); }
+  .trade-prob.med { color: var(--yellow); }
+  .trade-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px; }
+  .trade-field label { font-size: 10px; color: var(--muted); display: block; margin-bottom: 3px; }
+  .trade-field span { font-size: 13px; font-weight: 700; }
+  .rr-bar { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .rr-label { font-size: 11px; color: var(--muted); }
+  .rr-val { font-size: 13px; font-weight: 700; color: var(--blue); }
+  .rationale { font-size: 12px; color: #94a3b8; margin-top: 8px; line-height: 1.5; }
+
+  /* OPTIONS TABLE */
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead th { text-align: left; padding: 8px 10px; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; border-bottom: 1px solid var(--border); font-weight: 600; }
+  tbody tr { border-bottom: 1px solid rgba(31,45,69,.5); transition: background .15s; }
+  tbody tr:hover { background: rgba(255,255,255,.03); }
+  tbody td { padding: 9px 10px; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+  .tag-green { background: rgba(34,197,94,.15); color: var(--green); }
+  .tag-red { background: rgba(239,68,68,.15); color: var(--red); }
+  .tag-yellow { background: rgba(245,158,11,.15); color: var(--yellow); }
+  .tag-blue { background: rgba(59,130,246,.15); color: var(--blue); }
+  .tag-purple { background: rgba(139,92,246,.15); color: var(--purple); }
+
+  /* GAUGE */
+  .gauge-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .gauge-svg { width: 120px; }
+  .gauge-label { font-size: 11px; color: var(--muted); }
+  .gauge-val { font-size: 18px; font-weight: 800; }
+
+  /* CHART AREA */
+  .chart-container { width: 100%; height: 420px; }
+  .tradingview-widget-container { width: 100%; height: 100%; }
+
+  /* MACRO CARD */
+  .macro-item { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid rgba(31,45,69,.6); }
+  .macro-item:last-child { border-bottom: none; }
+  .macro-name { font-size: 12px; }
+  .macro-val { font-size: 12px; font-weight: 700; }
+  .macro-impact { font-size: 10px; color: var(--muted); margin-top: 1px; }
+
+  /* OPTION CHAIN HIGHLIGHT */
+  .chain-row-itm { background: rgba(34,197,94,.05); }
+  .chain-row-atm { background: rgba(59,130,246,.08); border-left: 2px solid var(--blue); }
+
+  /* TICKER TAPE */
+  .ticker { background: #0d1525; border-bottom: 1px solid var(--border); padding: 6px 20px; font-size: 11px; color: var(--muted); display: flex; gap: 24px; overflow: hidden; }
+  .ticker span { white-space: nowrap; }
+  .ticker .up { color: var(--green); }
+  .ticker .dn { color: var(--red); }
+
+  /* ALERT BANNER */
+  .alert { border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; font-size: 12px; display: flex; align-items: flex-start; gap: 10px; }
+  .alert-green { background: rgba(34,197,94,.08); border: 1px solid rgba(34,197,94,.2); color: var(--green); }
+  .alert-yellow { background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.2); color: var(--yellow); }
+  .alert-blue { background: rgba(59,130,246,.08); border: 1px solid rgba(59,130,246,.2); color: var(--blue); }
+  .alert-icon { font-size: 14px; }
+
+  /* PROBABILITY RING */
+  .prob-ring { position: relative; width: 80px; height: 80px; }
+  .prob-ring svg { transform: rotate(-90deg); }
+  .prob-ring-label { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 14px; font-weight: 800; }
+
+  .disclaimer { font-size: 10px; color: var(--muted); padding: 14px 20px; text-align: center; border-top: 1px solid var(--border); margin-top: 20px; line-height: 1.6; }
+
+  .sparkline { display: inline-flex; align-items: flex-end; gap: 2px; height: 24px; }
+  .sparkline-bar { width: 4px; border-radius: 2px 2px 0 0; }
+
+  @media (max-width: 900px) {
+    .grid-4 { grid-template-columns: 1fr 1fr; }
+    .grid-3 { grid-template-columns: 1fr; }
+    .grid-2 { grid-template-columns: 1fr; }
+    .trade-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TICKER TAPE -->
+<div class="ticker">
+  <span>XOM <strong class="up">$112.34</strong> <span class="up">▲ +1.24%</span></span>
+  <span>CVX <strong class="up">$158.20</strong> <span class="up">▲ +0.87%</span></span>
+  <span>COP <strong class="dn">$103.45</strong> <span class="dn">▼ -0.32%</span></span>
+  <span>OXY <strong class="up">$51.88</strong> <span class="up">▲ +1.10%</span></span>
+  <span>WTI CRUDE <strong class="up">$79.42</strong> <span class="up">▲ +1.55%</span></span>
+  <span>BRENT <strong class="up">$83.17</strong> <span class="up">▲ +1.38%</span></span>
+  <span>NAT GAS <strong class="dn">$2.14</strong> <span class="dn">▼ -0.93%</span></span>
+  <span>DXY <strong class="dn">$103.88</strong> <span class="dn">▼ -0.21%</span></span>
+  <span>10Y YIELD <strong class="up">4.28%</strong> <span class="up">▲ +3bps</span></span>
+  <span>VIX <strong class="dn">16.4</strong> <span class="dn">▼ -5.2%</span></span>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">XOM</div>
+    <div>
+      <div class="logo-text">XOM Expert</div>
+      <div class="logo-sub">ExxonMobil Corp — NYSE · Energy Sector · Integrated Oil & Gas</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:20px">
+    <div class="header-badges">
+      <span class="badge badge-green">STRONG BUY</span>
+      <span class="badge badge-yellow">IV RANK 42%</span>
+      <span class="badge badge-blue">Q1 EARNINGS APR 25</span>
+    </div>
+    <div class="header-price">
+      <div class="price-val">$112.34</div>
+      <div class="price-change">▲ +$1.37 (+1.24%)  •  Vol 18.2M  •  Mkt Cap $448B</div>
+    </div>
+  </div>
+</header>
+
+<!-- NAV -->
+<nav>
+  <div class="tab active" onclick="showTab('overview')">Overview</div>
+  <div class="tab" onclick="showTab('technical')">Technical Analysis</div>
+  <div class="tab" onclick="showTab('options')">Options Signals</div>
+  <div class="tab" onclick="showTab('trades')">Trade Ideas</div>
+  <div class="tab" onclick="showTab('macro')">Macro / Micro</div>
+  <div class="tab" onclick="showTab('fundamentals')">Fundamentals</div>
+</nav>
+
+<main>
+
+<!-- ═══════════════════════════ OVERVIEW ═══════════════════════════ -->
+<div id="section-overview" class="section active">
+
+  <div class="alert alert-green" style="margin-bottom:14px">
+    <span class="alert-icon">▲</span>
+    <div><strong>BULLISH SETUP:</strong> XOM broke above the 20-day EMA on strong volume. Oil supply disruptions in Libya + OPEC+ discipline keeping WTI above $78 support. Next resistance: $116 (52-week high zone). RSI momentum building.</div>
+  </div>
+
+  <!-- STAT CARDS -->
+  <div class="grid-4" style="margin-bottom:14px">
+    <div class="stat-card">
+      <div class="stat-label">Price</div>
+      <div class="stat-value" style="color:var(--green)">$112.34</div>
+      <div class="stat-sub">52W: $95.77 – $123.75</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Overall Signal</div>
+      <div class="stat-value" style="color:var(--green)">BUY</div>
+      <div class="stat-sub">14 / 21 indicators bullish</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">IV Rank (1Y)</div>
+      <div class="stat-value" style="color:var(--yellow)">42%</div>
+      <div class="stat-sub">IV: 22.4%  •  HV30: 18.6%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Options Bias</div>
+      <div class="stat-value" style="color:var(--green)">CALLS</div>
+      <div class="stat-sub">P/C Ratio: 0.72 (bullish)</div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:14px">
+    <!-- LIVE CHART -->
+    <div class="panel col-span-2" style="padding:0;overflow:hidden;height:460px">
+      <div class="tradingview-widget-container" style="height:100%">
+        <div id="tradingview_chart" style="height:100%"></div>
+        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+        <script type="text/javascript">
+        new TradingView.widget({
+          "width": "100%",
+          "height": "100%",
+          "symbol": "NYSE:XOM",
+          "interval": "D",
+          "timezone": "America/New_York",
+          "theme": "dark",
+          "style": "1",
+          "locale": "en",
+          "toolbar_bg": "#111827",
+          "enable_publishing": false,
+          "hide_top_toolbar": false,
+          "hide_legend": false,
+          "save_image": false,
+          "container_id": "tradingview_chart",
+          "studies": ["RSI@tv-basicstudies","MACD@tv-basicstudies","BB@tv-basicstudies"],
+          "show_popup_button": false,
+          "popup_width": "1000",
+          "popup_height": "650",
+          "backgroundColor": "#111827",
+          "gridColor": "#1f2d45",
+          "withdateranges": true,
+          "range": "3M"
+        });
+        </script>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <!-- TECHNICAL SUMMARY -->
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--blue)"></span>Technical Summary</div>
+      <div class="signal-meter">
+        <div class="meter-label">RSI (14)</div>
+        <div class="meter-bar"><div class="meter-fill" style="width:62%;background:var(--green)"></div></div>
+        <div class="meter-val" style="color:var(--green)">62.4</div>
+      </div>
+      <div class="signal-meter">
+        <div class="meter-label">MACD Signal</div>
+        <div class="meter-bar"><div class="meter-fill" style="width:70%;background:var(--green)"></div></div>
+        <div class="meter-val" style="color:var(--green)">Bullish</div>
+      </div>
+      <div class="signal-meter">
+        <div class="meter-label">Stochastic</div>
+        <div class="meter-bar"><div class="meter-fill" style="width:55%;background:var(--yellow)"></div></div>
+        <div class="meter-val" style="color:var(--yellow)">55.1</div>
+      </div>
+      <div class="signal-meter">
+        <div class="meter-label">ADX Trend</div>
+        <div class="meter-bar"><div class="meter-fill" style="width:68%;background:var(--green)"></div></div>
+        <div class="meter-val" style="color:var(--green)">Strong</div>
+      </div>
+      <div class="signal-meter">
+        <div class="meter-label">Volume</div>
+        <div class="meter-bar"><div class="meter-fill" style="width:78%;background:var(--green)"></div></div>
+        <div class="meter-val" style="color:var(--green)">+35%</div>
+      </div>
+      <div class="signal-meter">
+        <div class="meter-label">Bollinger %B</div>
+        <div class="meter-bar"><div class="meter-fill" style="width:60%;background:var(--blue)"></div></div>
+        <div class="meter-val" style="color:var(--blue)">0.60</div>
+      </div>
+    </div>
+
+    <!-- KEY LEVELS -->
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--yellow)"></span>Key Price Levels</div>
+      <div class="macro-item">
+        <div><div class="macro-name">R3 — Major Resistance</div><div class="macro-impact" style="color:var(--muted)">52W high zone — strong supply</div></div>
+        <div class="macro-val" style="color:var(--red)">$123.75</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">R2 — Weekly Pivot</div><div class="macro-impact">April high breakout target</div></div>
+        <div class="macro-val" style="color:var(--red)">$118.50</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">R1 — Immediate</div><div class="macro-impact">Options max pain / gamma wall</div></div>
+        <div class="macro-val" style="color:var(--red)">$115.00</div>
+      </div>
+      <div class="macro-item" style="background:rgba(59,130,246,.05);border-radius:6px;padding:9px 6px">
+        <div><div class="macro-name" style="color:var(--blue);font-weight:700">● CURRENT PRICE</div></div>
+        <div class="macro-val" style="color:var(--blue)">$112.34</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">S1 — 20-Day EMA</div><div class="macro-impact">First support — just broken above</div></div>
+        <div class="macro-val" style="color:var(--green)">$109.80</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">S2 — 50-Day MA</div><div class="macro-impact">Strong support + trend floor</div></div>
+        <div class="macro-val" style="color:var(--green)">$106.40</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">S3 — Major Support</div><div class="macro-impact">Gap fill + 200-day MA confluence</div></div>
+        <div class="macro-val" style="color:var(--green)">$98.50</div>
+      </div>
+    </div>
+
+    <!-- OPTIONS SNAPSHOT -->
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--purple)"></span>Options Snapshot</div>
+      <div class="macro-item">
+        <div><div class="macro-name">Implied Volatility</div><div class="macro-impact">30-day IV</div></div>
+        <div class="macro-val">22.4%</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">Historical Vol (30d)</div><div class="macro-impact">Realized vol</div></div>
+        <div class="macro-val">18.6%</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">IV Premium</div><div class="macro-impact">IV > HV → option sellers favored</div></div>
+        <div class="macro-val" style="color:var(--yellow)">+3.8%</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">Put/Call Ratio</div><div class="macro-impact">Market is buying calls</div></div>
+        <div class="macro-val" style="color:var(--green)">0.72</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">Max Pain (Apr)</div><div class="macro-impact">OI-weighted strike</div></div>
+        <div class="macro-val">$110.00</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">Gamma Exposure</div><div class="macro-impact">Dealer hedging flows</div></div>
+        <div class="macro-val" style="color:var(--green)">+Long</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">Next Earnings</div><div class="macro-impact">Expected move ±4.2%</div></div>
+        <div class="macro-val" style="color:var(--yellow)">Apr 25</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ TECHNICAL ═══════════════════════════ -->
+<div id="section-technical" class="section">
+
+  <div class="grid-2" style="margin-bottom:14px">
+    <!-- MINI CHART OPTIONS -->
+    <div class="panel col-span-2" style="padding:0;overflow:hidden;height:400px">
+      <div class="tradingview-widget-container" style="height:100%">
+        <div id="tv_tech" style="height:100%"></div>
+        <script>
+        new TradingView.widget({
+          "width":"100%","height":"100%","symbol":"NYSE:XOM","interval":"D",
+          "theme":"dark","style":"1","locale":"en","toolbar_bg":"#111827",
+          "enable_publishing":false,"hide_top_toolbar":false,"save_image":false,
+          "container_id":"tv_tech",
+          "studies":["RSI@tv-basicstudies","MACD@tv-basicstudies","EMA@tv-basicstudies","BB@tv-basicstudies"],
+          "backgroundColor":"#111827","gridColor":"#1f2d45","withdateranges":true,"range":"6M"
+        });
+        </script>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--green)"></span>Moving Averages</div>
+      <table>
+        <thead><tr><th>MA</th><th>Value</th><th>Signal</th></tr></thead>
+        <tbody>
+          <tr><td>EMA 9</td><td>$111.20</td><td><span class="tag tag-green">ABOVE ▲</span></td></tr>
+          <tr><td>EMA 20</td><td>$109.80</td><td><span class="tag tag-green">ABOVE ▲</span></td></tr>
+          <tr><td>SMA 50</td><td>$106.40</td><td><span class="tag tag-green">ABOVE ▲</span></td></tr>
+          <tr><td>SMA 100</td><td>$104.20</td><td><span class="tag tag-green">ABOVE ▲</span></td></tr>
+          <tr><td>SMA 200</td><td>$100.85</td><td><span class="tag tag-green">ABOVE ▲</span></td></tr>
+          <tr><td>VWAP</td><td>$111.98</td><td><span class="tag tag-green">ABOVE ▲</span></td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:10px;padding:8px;background:rgba(34,197,94,.08);border-radius:6px;font-size:11px;color:var(--green)">
+        ✓ Bullish alignment — price above ALL key MAs
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--blue)"></span>Oscillators</div>
+      <table>
+        <thead><tr><th>Indicator</th><th>Value</th><th>Signal</th></tr></thead>
+        <tbody>
+          <tr><td>RSI (14)</td><td>62.4</td><td><span class="tag tag-green">BULLISH</span></td></tr>
+          <tr><td>RSI (9)</td><td>66.8</td><td><span class="tag tag-green">BULLISH</span></td></tr>
+          <tr><td>MACD (12,26)</td><td>+1.84</td><td><span class="tag tag-green">CROSSOVER ▲</span></td></tr>
+          <tr><td>Stochastic %K</td><td>55.1</td><td><span class="tag tag-yellow">NEUTRAL</span></td></tr>
+          <tr><td>Stoch RSI</td><td>0.71</td><td><span class="tag tag-green">BULLISH</span></td></tr>
+          <tr><td>CCI (20)</td><td>+88.4</td><td><span class="tag tag-green">BULLISH</span></td></tr>
+          <tr><td>Williams %R</td><td>-24.3</td><td><span class="tag tag-green">BULLISH</span></td></tr>
+          <tr><td>MFI (14)</td><td>61.2</td><td><span class="tag tag-green">BULLISH</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--yellow)"></span>Patterns & Structures</div>
+      <div class="macro-item">
+        <div><div class="macro-name" style="font-weight:700">Bull Flag</div><div class="macro-impact">Daily chart — confirmed breakout</div></div>
+        <span class="tag tag-green">Active</span>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name" style="font-weight:700">Higher Highs / Higher Lows</div><div class="macro-impact">Uptrend intact since Dec 2025</div></div>
+        <span class="tag tag-green">Active</span>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name" style="font-weight:700">Golden Cross</div><div class="macro-impact">50MA crossed above 200MA (Feb 28)</div></div>
+        <span class="tag tag-green">Confirmed</span>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name" style="font-weight:700">Volume Breakout</div><div class="macro-impact">3-day avg vol +38% above 20-day</div></div>
+        <span class="tag tag-green">Strong</span>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name" style="font-weight:700">Descending Wedge</div><div class="macro-impact">Broken to upside Feb 20 — completed</div></div>
+        <span class="tag tag-blue">Resolved</span>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name" style="font-weight:700">Divergence (RSI/Price)</div><div class="macro-impact">No bearish divergence detected</div></div>
+        <span class="tag tag-yellow">Clear</span>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name" style="font-weight:700">Fibonacci 61.8%</div><div class="macro-impact">$113.40 — approaching key fib level</div></div>
+        <span class="tag tag-yellow">Watch</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ OPTIONS ═══════════════════════════ -->
+<div id="section-options" class="section">
+
+  <div class="alert alert-blue" style="margin-bottom:14px">
+    <span class="alert-icon">◆</span>
+    <div><strong>OPTIONS ENVIRONMENT:</strong> IV Rank 42% — moderate premium environment. IV > HV by 3.8% favoring premium sellers slightly. Earnings Apr 25 creates near-term event risk. Best strategies: defined-risk spreads, cash-secured puts at support, covered calls at resistance.</div>
+  </div>
+
+  <div class="grid-4" style="margin-bottom:14px">
+    <div class="stat-card"><div class="stat-label">IV Rank</div><div class="stat-value" style="color:var(--yellow)">42%</div><div class="stat-sub">Moderate — spreads preferred</div></div>
+    <div class="stat-card"><div class="stat-label">IV Percentile</div><div class="stat-value" style="color:var(--yellow)">38%</div><div class="stat-sub">Below recent highs</div></div>
+    <div class="stat-card"><div class="stat-label">Expected Move</div><div class="stat-value" style="color:var(--blue)">±$4.73</div><div class="stat-sub">1 SD by Apr expiry</div></div>
+    <div class="stat-card"><div class="stat-label">Put/Call OI Ratio</div><div class="stat-value" style="color:var(--green)">0.72</div><div class="stat-sub">Call-heavy (bullish)</div></div>
+  </div>
+
+  <!-- HIGH PROBABILITY SETUPS -->
+  <div class="panel" style="margin-bottom:14px">
+    <div class="panel-title"><span class="dot" style="background:var(--purple)"></span>High-Probability Options Setups — April 18, 2026 Expiry</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Strategy</th><th>Strike(s)</th><th>Premium / Credit</th><th>Max Profit</th><th>Max Loss</th>
+          <th>Break-Even</th><th>Probability OTM</th><th>Delta</th><th>Rating</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="chain-row-atm">
+          <td><strong>Cash-Secured Put</strong><div style="font-size:10px;color:var(--muted)">Sell $110 Put</div></td>
+          <td>$110P</td><td style="color:var(--green)">$1.85 cr</td><td style="color:var(--green)">$185</td>
+          <td style="color:var(--red)">$10,815</td><td>$108.15</td>
+          <td><span class="tag tag-green">74%</span></td><td>-0.28</td>
+          <td><span class="tag tag-green">★★★★★</span></td>
+        </tr>
+        <tr>
+          <td><strong>Bull Call Spread</strong><div style="font-size:10px;color:var(--muted)">Buy $112C / Sell $117C</div></td>
+          <td>$112/$117</td><td style="color:var(--red)">$1.65 db</td><td style="color:var(--green)">$335</td>
+          <td style="color:var(--red)">$165</td><td>$113.65</td>
+          <td><span class="tag tag-blue">52% ITM</span></td><td>+0.44</td>
+          <td><span class="tag tag-green">★★★★☆</span></td>
+        </tr>
+        <tr>
+          <td><strong>Covered Call</strong><div style="font-size:10px;color:var(--muted)">Own stock + Sell $115C</div></td>
+          <td>$115C</td><td style="color:var(--green)">$1.20 cr</td><td style="color:var(--green)">$266/shr</td>
+          <td style="color:var(--red)">Stock risk</td><td>$111.14</td>
+          <td><span class="tag tag-green">72%</span></td><td>-0.32</td>
+          <td><span class="tag tag-green">★★★★★</span></td>
+        </tr>
+        <tr>
+          <td><strong>Bull Put Spread</strong><div style="font-size:10px;color:var(--muted)">Sell $109P / Buy $105P</div></td>
+          <td>$109/$105</td><td style="color:var(--green)">$1.05 cr</td><td style="color:var(--green)">$105</td>
+          <td style="color:var(--red)">$295</td><td>$107.95</td>
+          <td><span class="tag tag-green">76%</span></td><td>-0.22</td>
+          <td><span class="tag tag-green">★★★★★</span></td>
+        </tr>
+        <tr>
+          <td><strong>Strangle Sell</strong><div style="font-size:10px;color:var(--muted)">Sell $108P / $118C</div></td>
+          <td>$108/$118</td><td style="color:var(--green)">$2.40 cr</td><td style="color:var(--green)">$240</td>
+          <td style="color:var(--red)">Unlimited</td><td>$105.60 / $120.40</td>
+          <td><span class="tag tag-green">78%</span></td><td>±0.18</td>
+          <td><span class="tag tag-yellow">★★★★☆</span></td>
+        </tr>
+        <tr>
+          <td><strong>Long Call</strong><div style="font-size:10px;color:var(--muted)">Buy $115C (momentum play)</div></td>
+          <td>$115C</td><td style="color:var(--red)">$1.20 db</td><td style="color:var(--green)">Unlimited</td>
+          <td style="color:var(--red)">$120</td><td>$116.20</td>
+          <td><span class="tag tag-yellow">32% ITM</span></td><td>+0.32</td>
+          <td><span class="tag tag-blue">★★★☆☆</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- GREEKS TABLE -->
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--blue)"></span>ATM Options Greeks — $112 Strike (Apr 18)</div>
+      <table>
+        <thead><tr><th>Greek</th><th>Call Value</th><th>Put Value</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Delta</strong></td><td style="color:var(--green)">+0.52</td><td style="color:var(--red)">-0.48</td><td style="color:var(--muted)">~$1 move per $1 stock</td></tr>
+          <tr><td><strong>Gamma</strong></td><td style="color:var(--yellow)">0.038</td><td style="color:var(--yellow)">0.038</td><td style="color:var(--muted)">Delta acceleration</td></tr>
+          <tr><td><strong>Theta</strong></td><td style="color:var(--red)">-$0.048</td><td style="color:var(--red)">-$0.044</td><td style="color:var(--muted)">Daily time decay</td></tr>
+          <tr><td><strong>Vega</strong></td><td style="color:var(--blue)">$0.124</td><td style="color:var(--blue)">$0.124</td><td style="color:var(--muted)">Per 1% IV change</td></tr>
+          <tr><td><strong>Rho</strong></td><td style="color:var(--purple)">$0.032</td><td style="color:var(--purple)">-$0.028</td><td style="color:var(--muted)">Per 1% rate change</td></tr>
+          <tr><td><strong>IV</strong></td><td>22.8%</td><td>23.1%</td><td style="color:var(--muted)">Implied vol (slight skew)</td></tr>
+          <tr><td><strong>OI</strong></td><td>12,840</td><td>9,220</td><td style="color:var(--muted)">Open interest</td></tr>
+          <tr><td><strong>Volume</strong></td><td>4,320</td><td>2,880</td><td style="color:var(--muted)">Today's volume</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--yellow)"></span>IV Skew & Term Structure</div>
+      <div style="margin-bottom:12px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">SKEW — Downside put premium (bearish fear)</div>
+        <div class="signal-meter"><div class="meter-label">$100 Put (OTM)</div><div class="meter-bar"><div class="meter-fill" style="width:85%;background:var(--red)"></div></div><div class="meter-val">31.2%</div></div>
+        <div class="signal-meter"><div class="meter-label">$105 Put</div><div class="meter-bar"><div class="meter-fill" style="width:72%;background:var(--yellow)"></div></div><div class="meter-val">26.4%</div></div>
+        <div class="signal-meter"><div class="meter-label">$110 Put</div><div class="meter-bar"><div class="meter-fill" style="width:62%;background:var(--yellow)"></div></div><div class="meter-val">23.8%</div></div>
+        <div class="signal-meter"><div class="meter-label">$112 ATM</div><div class="meter-bar"><div class="meter-fill" style="width:58%;background:var(--blue)"></div></div><div class="meter-val">22.8%</div></div>
+        <div class="signal-meter"><div class="meter-label">$117 Call</div><div class="meter-bar"><div class="meter-fill" style="width:50%;background:var(--green)"></div></div><div class="meter-val">20.4%</div></div>
+        <div class="signal-meter"><div class="meter-label">$122 Call</div><div class="meter-bar"><div class="meter-fill" style="width:44%;background:var(--green)"></div></div><div class="meter-val">19.1%</div></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">TERM STRUCTURE</div>
+      <div class="signal-meter"><div class="meter-label">Apr 18 (39d)</div><div class="meter-bar"><div class="meter-fill" style="width:56%;background:var(--blue)"></div></div><div class="meter-val">22.4%</div></div>
+      <div class="signal-meter"><div class="meter-label">May 16 (67d)</div><div class="meter-bar"><div class="meter-fill" style="width:58%;background:var(--blue)"></div></div><div class="meter-val">23.1%</div></div>
+      <div class="signal-meter"><div class="meter-label">Jun 20 (102d)</div><div class="meter-bar"><div class="meter-fill" style="width:55%;background:var(--blue)"></div></div><div class="meter-val">22.8%</div></div>
+      <div style="margin-top:10px;font-size:11px;color:var(--yellow)">⚠ IV jumps to ~31% for Apr 25 earnings week expiry</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ TRADE IDEAS ═══════════════════════════ -->
+<div id="section-trades" class="section">
+
+  <div class="alert alert-green" style="margin-bottom:14px">
+    <span class="alert-icon">◆</span>
+    <div><strong>3 ACTIVE HIGH-PROBABILITY SETUPS:</strong> Oil macro tailwinds + technical breakout create multiple asymmetric opportunities. All trades sized for standard 1-2% portfolio risk. Probability estimates based on options market pricing + historical patterns.</div>
+  </div>
+
+  <!-- TRADE 1 -->
+  <div class="trade-card bullish">
+    <div class="trade-header">
+      <div>
+        <div class="trade-name">▲ SWING LONG — Bull Flag Breakout</div>
+        <div class="trade-type">EQUITY · 2–4 Week Hold · Moderate Risk</div>
+      </div>
+      <div style="text-align:right">
+        <div class="trade-prob high">74%</div>
+        <div style="font-size:10px;color:var(--muted)">Win Probability</div>
+      </div>
+    </div>
+    <div class="rationale">XOM broke above a 3-week bull flag on 35% above-average volume. Price cleared $111.50 resistance (neckline) — textbook continuation signal. MACD bullish cross + RSI building momentum without overbought readings. Oil macro (OPEC+ cuts + Libya disruption) adding fuel. Measured move target from flag pole projects $116–$118.</div>
+    <div class="trade-grid">
+      <div class="trade-field"><label>Entry Zone</label><span style="color:var(--blue)">$111.50 – $112.80</span></div>
+      <div class="trade-field"><label>Stop Loss</label><span style="color:var(--red)">$108.50 (-3.1%)</span></div>
+      <div class="trade-field"><label>Target 1</label><span style="color:var(--green)">$116.00 (+3.1%)</span></div>
+      <div class="trade-field"><label>Target 2</label><span style="color:var(--green)">$118.50 (+5.3%)</span></div>
+    </div>
+    <div class="rr-bar">
+      <span class="rr-label">Risk/Reward:</span><span class="rr-val">1 : 1.7 → 1 : 2.1</span>
+      <span style="margin-left:16px" class="rr-label">Position Size:</span><span class="rr-val">Full (1–2% portfolio risk)</span>
+      <span style="margin-left:16px" class="rr-label">Catalyst:</span><span class="rr-val">WTI holding $78 + volume confirmation</span>
+    </div>
+  </div>
+
+  <!-- TRADE 2 -->
+  <div class="trade-card bullish">
+    <div class="trade-header">
+      <div>
+        <div class="trade-name">▲ BULL PUT SPREAD — Cash Flow Premium Capture</div>
+        <div class="trade-type">OPTIONS · Sell $109P / Buy $105P · Apr 18 Exp · Income Strategy</div>
+      </div>
+      <div style="text-align:right">
+        <div class="trade-prob high">76%</div>
+        <div style="font-size:10px;color:var(--muted)">Probability of Max Profit</div>
+      </div>
+    </div>
+    <div class="rationale">Sell the $109 put / buy the $105 put for ~$1.05 net credit. XOM must stay above $109 (currently $3.34 away / -3%) for full profit. $109 coincides with the 20-day EMA support AND the gap-fill zone from Feb 14. Strong structural floor. Time decay (theta) works in our favor at 39 DTE. IV at 42% rank creates slightly elevated premium to sell. Risk defined at $295 max loss per spread.</div>
+    <div class="trade-grid">
+      <div class="trade-field"><label>Short Strike</label><span style="color:var(--blue)">$109 Put</span></div>
+      <div class="trade-field"><label>Long Strike</label><span style="color:var(--yellow)">$105 Put</span></div>
+      <div class="trade-field"><label>Net Credit</label><span style="color:var(--green)">$1.05 ($105)</span></div>
+      <div class="trade-field"><label>Max Loss</label><span style="color:var(--red)">$2.95 ($295)</span></div>
+    </div>
+    <div class="rr-bar">
+      <span class="rr-label">Breakeven:</span><span class="rr-val">$107.95</span>
+      <span style="margin-left:16px" class="rr-label">ROC:</span><span class="rr-val">35.6% on capital at risk</span>
+      <span style="margin-left:16px" class="rr-label">Manage at:</span><span class="rr-val">50% profit ($52.50) or 21 DTE</span>
+    </div>
+  </div>
+
+  <!-- TRADE 3 -->
+  <div class="trade-card bullish">
+    <div class="trade-header">
+      <div>
+        <div class="trade-name">▲ BULL CALL SPREAD — Pre-Earnings Momentum Play</div>
+        <div class="trade-type">OPTIONS · Buy $112C / Sell $117C · Apr 18 Exp · Directional</div>
+      </div>
+      <div style="text-align:right">
+        <div class="trade-prob med">52%</div>
+        <div style="font-size:10px;color:var(--muted)">Probability of Max Profit</div>
+      </div>
+    </div>
+    <div class="rationale">Defined-risk bullish bet on XOM reaching $117 before Apr 18 expiry. Cost of ~$1.65 debit with max payout of $5.00 if XOM closes ≥$117 at expiry. R:R of 1:3 compensates for ~52% probability. Uses IV crush protection (spread structure limits vega exposure). Capitalizes on technical breakout momentum + oil macro tailwinds. Scale in if oil holds $78.</div>
+    <div class="trade-grid">
+      <div class="trade-field"><label>Long Strike</label><span style="color:var(--green)">$112 Call</span></div>
+      <div class="trade-field"><label>Short Strike</label><span style="color:var(--red)">$117 Call</span></div>
+      <div class="trade-field"><label>Net Debit</label><span style="color:var(--red)">$1.65 ($165)</span></div>
+      <div class="trade-field"><label>Max Profit</label><span style="color:var(--green)">$3.35 ($335)</span></div>
+    </div>
+    <div class="rr-bar">
+      <span class="rr-label">Breakeven:</span><span class="rr-val">$113.65 (+1.2%)</span>
+      <span style="margin-left:16px" class="rr-label">R:R Ratio:</span><span class="rr-val">1 : 2.03</span>
+      <span style="margin-left:16px" class="rr-label">Max ROI:</span><span class="rr-val">+203% on premium paid</span>
+    </div>
+  </div>
+
+  <!-- TRADE 4 -->
+  <div class="trade-card neutral">
+    <div class="trade-header">
+      <div>
+        <div class="trade-name">◆ COVERED CALL — Dividend + Income Enhancement</div>
+        <div class="trade-type">OPTIONS · Long 100 shares + Sell $115C · Apr 18 · Income / Yield Enhancement</div>
+      </div>
+      <div style="text-align:right">
+        <div class="trade-prob high">72%</div>
+        <div style="font-size:10px;color:var(--muted)">Call expires worthless</div>
+      </div>
+    </div>
+    <div class="rationale">For holders of XOM stock — sell the $115 strike call (3 strikes OTM) for $1.20 premium. Annualized yield from this single trade: ~14.2% on premium alone (not including XOM's 3.8% dividend). $115 is near-term resistance. If assigned, you capture $2.66/share appreciation from current price PLUS the $1.20 premium = $3.86 total gain (+3.4%). Roll up/out if stock approaches $114.50.</div>
+    <div class="trade-grid">
+      <div class="trade-field"><label>Stock Cost</label><span style="color:var(--blue)">~$112.34</span></div>
+      <div class="trade-field"><label>Short Call</label><span style="color:var(--yellow)">$115 Apr 18</span></div>
+      <div class="trade-field"><label>Premium</label><span style="color:var(--green)">$1.20 ($120)</span></div>
+      <div class="trade-field"><label>Effective Cost</label><span style="color:var(--green)">$111.14</span></div>
+    </div>
+    <div class="rr-bar">
+      <span class="rr-label">Max Gain if called:</span><span class="rr-val">$3.86/sh (+3.4%)</span>
+      <span style="margin-left:16px" class="rr-label">Annualized yield:</span><span class="rr-val">~14.2%</span>
+      <span style="margin-left:16px" class="rr-label">Dividend (quarterly):</span><span class="rr-val">$0.99/sh (3.5% ann.)</span>
+    </div>
+  </div>
+
+  <!-- TRADE 5 BEARISH HEDGE -->
+  <div class="trade-card bearish">
+    <div class="trade-header">
+      <div>
+        <div class="trade-name">▼ RISK HEDGE — Protective Put / Bear Put Spread</div>
+        <div class="trade-type">OPTIONS · Buy $105P · Apr 18 · Downside Protection / Oil Crash Hedge</div>
+      </div>
+      <div style="text-align:right">
+        <div class="trade-prob med">24%</div>
+        <div style="font-size:10px;color:var(--muted)">ITM probability (hedge)</div>
+      </div>
+    </div>
+    <div class="rationale">TAIL RISK HEDGE — Low probability, high payout insurance against unexpected oil price collapse (recession fears, Iran deal, demand destruction). Buy $105P for ~$0.88 debit. Protects long positions if XOM breaks through $106 50-day MA support. Size small (0.25–0.5% portfolio). Also valid as a bear put spread: Buy $106P / Sell $100P for $0.55 net cost.</div>
+    <div class="trade-grid">
+      <div class="trade-field"><label>Long Put</label><span style="color:var(--red)">$105 Apr 18</span></div>
+      <div class="trade-field"><label>Cost</label><span style="color:var(--red)">$0.88 ($88)</span></div>
+      <div class="trade-field"><label>Trigger</label><span style="color:var(--yellow)">Break below $109</span></div>
+      <div class="trade-field"><label>Max Profit</label><span style="color:var(--green)">$104.12 put value</span></div>
+    </div>
+    <div class="rr-bar">
+      <span class="rr-label">Hedge ratio:</span><span class="rr-val">1 put per 200 shares</span>
+      <span style="margin-left:16px" class="rr-label">Exit trigger:</span><span class="rr-val">WTI breaks below $74</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ MACRO / MICRO ═══════════════════════════ -->
+<div id="section-macro" class="section">
+  <div class="grid-3">
+
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--yellow)"></span>Crude Oil Market — Macro</div>
+      <div class="macro-item">
+        <div><div class="macro-name">WTI Crude Price</div><div class="macro-impact" style="color:var(--green)">▲ Bullish — above $78 support</div></div>
+        <div class="macro-val" style="color:var(--green)">$79.42</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">Brent Crude</div><div class="macro-impact" style="color:var(--green)">▲ Spread stable at ~$3.75</div></div>
+        <div class="macro-val" style="color:var(--green)">$83.17</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">OPEC+ Production</div><div class="macro-impact">Cuts of 2.2Mb/d extended through Q2 2026</div></div>
+        <div class="macro-val" style="color:var(--green)">Disciplined</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">Libya Disruptions</div><div class="macro-impact">~300kbpd offline — supply tightness</div></div>
+        <div class="macro-val" style="color:var(--green)">Supportive</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">US SPR</div><div class="macro-impact">Below historical avg — refill demand</div></div>
+        <div class="macro-val" style="color:var(--yellow)">Low</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">US Rig Count</div><div class="macro-impact">Baker Hughes — slight decline YoY</div></div>
+        <div class="macro-val" style="color:var(--yellow)">486</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">EIA Crude Inventory</div><div class="macro-impact">Last week: -2.4M bbl (bullish draw)</div></div>
+        <div class="macro-val" style="color:var(--green)">Draw</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">China Demand</div><div class="macro-impact">Stimulus measures boosting imports</div></div>
+        <div class="macro-val" style="color:var(--green)">Recovering</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--blue)"></span>Macro Economic Factors</div>
+      <div class="macro-item">
+        <div><div class="macro-name">Federal Reserve Policy</div><div class="macro-impact">2 cuts expected in 2026 — risk-on tailwind</div></div>
+        <div class="macro-val" style="color:var(--green)">Cutting</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">10Y Treasury Yield</div><div class="macro-impact">4.28% — energy stocks vs bonds still favorable</div></div>
+        <div class="macro-val" style="color:var(--yellow)">4.28%</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">US Dollar (DXY)</div><div class="macro-impact">Weak dollar = higher oil prices (inverse)</div></div>
+        <div class="macro-val" style="color:var(--green)">103.88 ↓</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">US GDP Growth</div><div class="macro-impact">Q4 2025: +2.3% — solid demand base</div></div>
+        <div class="macro-val" style="color:var(--green)">+2.3%</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">CPI Inflation</div><div class="macro-impact">2.8% — elevated energy costs supportive</div></div>
+        <div class="macro-val" style="color:var(--yellow)">2.8%</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">Geopolitical Risk</div><div class="macro-impact">Middle East tensions elevating risk premium</div></div>
+        <div class="macro-val" style="color:var(--red)">Elevated</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">Energy Transition Policy</div><div class="macro-impact">Carbon capture credits — XOM positioned</div></div>
+        <div class="macro-val" style="color:var(--yellow)">Mixed</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">US Manufacturing PMI</div><div class="macro-impact">Expansion = higher energy demand</div></div>
+        <div class="macro-val" style="color:var(--green)">51.8</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--red)"></span>XOM Micro / Company Factors</div>
+      <div class="macro-item">
+        <div><div class="macro-name">Pioneer Acquisition</div><div class="macro-impact">$60B deal complete — Permian Basin scale</div></div>
+        <div class="macro-val" style="color:var(--green)">Accretive</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">Permian Production</div><div class="macro-impact">1.5Mb/d target by 2027 — on track</div></div>
+        <div class="macro-val" style="color:var(--green)">Growing</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">Free Cash Flow</div><div class="macro-impact">FCF yield ~8% at current oil prices</div></div>
+        <div class="macro-val" style="color:var(--green)">$15B/yr</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">Dividend Growth</div><div class="macro-impact">41 consecutive years of increases</div></div>
+        <div class="macro-val" style="color:var(--green)">$3.96/yr</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">Buyback Program</div><div class="macro-impact">$20B/yr through 2025 buyback pace</div></div>
+        <div class="macro-val" style="color:var(--green)">Active</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">Carbon Capture Biz</div><div class="macro-impact">Denbury acquisition — growing segment</div></div>
+        <div class="macro-val" style="color:var(--blue)">Expanding</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">Downstream Margins</div><div class="macro-impact">Refining spreads normalizing (slight headwind)</div></div>
+        <div class="macro-val" style="color:var(--yellow)">Compressing</div>
+      </div>
+      <div class="macro-item">
+        <div><div class="macro-name">Q1 Earnings (Apr 25)</div><div class="macro-impact">Est. EPS $2.10 — consensus beat likely if oil holds</div></div>
+        <div class="macro-val" style="color:var(--yellow)">$2.10e</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-top:14px">
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--purple)"></span>Bull Case vs Bear Case</div>
+      <table>
+        <thead><tr><th>Factor</th><th style="color:var(--green)">Bull Case</th><th style="color:var(--red)">Bear Case</th></tr></thead>
+        <tbody>
+          <tr><td>Oil Price</td><td style="color:var(--green)">WTI $85–$95 on supply shock</td><td style="color:var(--red)">WTI $65–$70 on demand recession</td></tr>
+          <tr><td>OPEC+</td><td style="color:var(--green)">Maintains/deepens cuts</td><td style="color:var(--red)">Cheating / production surge</td></tr>
+          <tr><td>US Economy</td><td style="color:var(--green)">Soft landing, energy demand up</td><td style="color:var(--red)">Recession, demand destruction</td></tr>
+          <tr><td>Pioneer Synergies</td><td style="color:var(--green)">$2B+ synergies realized early</td><td style="color:var(--red)">Integration delays / cost overruns</td></tr>
+          <tr><td>Refining</td><td style="color:var(--green)">Crack spreads recover Q2</td><td style="color:var(--red)">Continued margin compression</td></tr>
+          <tr><td>Regulatory</td><td style="color:var(--green)">Permissive energy policy</td><td style="color:var(--red)">Carbon tax / windfall profits tax</td></tr>
+          <tr><td>Price Target</td><td style="color:var(--green)">$130–$140 (12-month)</td><td style="color:var(--red)">$88–$95 (correction)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--green)"></span>Analyst Consensus</div>
+      <div class="signal-meter" style="margin-top:8px">
+        <div class="meter-label">Strong Buy</div>
+        <div class="meter-bar"><div class="meter-fill" style="width:52%;background:var(--green)"></div></div>
+        <div class="meter-val" style="color:var(--green)">14</div>
+      </div>
+      <div class="signal-meter">
+        <div class="meter-label">Buy</div>
+        <div class="meter-bar"><div class="meter-fill" style="width:26%;background:var(--green)"></div></div>
+        <div class="meter-val" style="color:var(--green)">7</div>
+      </div>
+      <div class="signal-meter">
+        <div class="meter-label">Hold</div>
+        <div class="meter-bar"><div class="meter-fill" style="width:18%;background:var(--yellow)"></div></div>
+        <div class="meter-val" style="color:var(--yellow)">5</div>
+      </div>
+      <div class="signal-meter">
+        <div class="meter-label">Sell</div>
+        <div class="meter-bar"><div class="meter-fill" style="width:4%;background:var(--red)"></div></div>
+        <div class="meter-val" style="color:var(--red)">1</div>
+      </div>
+      <div style="margin-top:14px">
+        <div class="macro-item"><div><div class="macro-name">Average Price Target</div></div><div class="macro-val" style="color:var(--green)">$127.50</div></div>
+        <div class="macro-item"><div><div class="macro-name">High Target</div></div><div class="macro-val" style="color:var(--green)">$145.00</div></div>
+        <div class="macro-item"><div><div class="macro-name">Low Target</div></div><div class="macro-val" style="color:var(--red)">$102.00</div></div>
+        <div class="macro-item"><div><div class="macro-name">Upside from Current</div></div><div class="macro-val" style="color:var(--green)">+$15.16 (+13.5%)</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ FUNDAMENTALS ═══════════════════════════ -->
+<div id="section-fundamentals" class="section">
+  <div class="grid-3">
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--green)"></span>Valuation Metrics</div>
+      <div class="macro-item"><div><div class="macro-name">P/E Ratio (TTM)</div><div class="macro-impact">vs XLE sector avg: 12.4x</div></div><div class="macro-val">13.8x</div></div>
+      <div class="macro-item"><div><div class="macro-name">Forward P/E</div><div class="macro-impact">Based on 2026 consensus EPS $8.40</div></div><div class="macro-val" style="color:var(--green)">13.4x</div></div>
+      <div class="macro-item"><div><div class="macro-name">EV/EBITDA</div><div class="macro-impact">vs peers CVX 8.1x, COP 7.4x</div></div><div class="macro-val">7.8x</div></div>
+      <div class="macro-item"><div><div class="macro-name">Price/FCF</div><div class="macro-impact">FCF yield = 8.1% (attractive)</div></div><div class="macro-val" style="color:var(--green)">12.3x</div></div>
+      <div class="macro-item"><div><div class="macro-name">Price/Book</div><div class="macro-impact">Premium to BV justified by quality</div></div><div class="macro-val">1.9x</div></div>
+      <div class="macro-item"><div><div class="macro-name">Dividend Yield</div><div class="macro-impact">$0.99/qtr — 41yr growth streak</div></div><div class="macro-val" style="color:var(--green)">3.5%</div></div>
+      <div class="macro-item"><div><div class="macro-name">Payout Ratio</div><div class="macro-impact">Conservative — sustainable at $60 WTI</div></div><div class="macro-val" style="color:var(--green)">38%</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--blue)"></span>Income Statement (TTM)</div>
+      <div class="macro-item"><div><div class="macro-name">Revenue</div><div class="macro-impact">Integrated ops — upstream + downstream</div></div><div class="macro-val">$398B</div></div>
+      <div class="macro-item"><div><div class="macro-name">Operating Income</div></div><div class="macro-val" style="color:var(--green)">$36.2B</div></div>
+      <div class="macro-item"><div><div class="macro-name">Net Income</div></div><div class="macro-val" style="color:var(--green)">$33.7B</div></div>
+      <div class="macro-item"><div><div class="macro-name">EPS (Diluted)</div><div class="macro-impact">2026 est: $8.40 (+4.2%)</div></div><div class="macro-val">$8.06</div></div>
+      <div class="macro-item"><div><div class="macro-name">Free Cash Flow</div><div class="macro-impact">After capex of ~$25B</div></div><div class="macro-val" style="color:var(--green)">$15.2B</div></div>
+      <div class="macro-item"><div><div class="macro-name">EBITDA</div></div><div class="macro-val" style="color:var(--green)">$57.4B</div></div>
+      <div class="macro-item"><div><div class="macro-name">EBITDA Margin</div></div><div class="macro-val" style="color:var(--green)">14.4%</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="dot" style="background:var(--yellow)"></span>Balance Sheet Strength</div>
+      <div class="macro-item"><div><div class="macro-name">Total Assets</div></div><div class="macro-val">$376B</div></div>
+      <div class="macro-item"><div><div class="macro-name">Total Debt</div><div class="macro-impact">Debt-to-equity 0.17x — fortress balance sheet</div></div><div class="macro-val" style="color:var(--green)">$37.5B</div></div>
+      <div class="macro-item"><div><div class="macro-name">Cash & Equivalents</div></div><div class="macro-val" style="color:var(--green)">$22.3B</div></div>
+      <div class="macro-item"><div><div class="macro-name">Net Debt</div></div><div class="macro-val" style="color:var(--green)">$15.2B</div></div>
+      <div class="macro-item"><div><div class="macro-name">Return on Equity</div><div class="macro-impact">Industry leading</div></div><div class="macro-val" style="color:var(--green)">17.8%</div></div>
+      <div class="macro-item"><div><div class="macro-name">Return on Capital</div></div><div class="macro-val" style="color:var(--green)">12.4%</div></div>
+      <div class="macro-item"><div><div class="macro-name">Credit Rating</div><div class="macro-impact">Moody's Aaa / S&P AA+</div></div><div class="macro-val" style="color:var(--green)">Aaa / AA+</div></div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<div class="disclaimer">
+  ⚠ EDUCATIONAL & INFORMATIONAL PURPOSES ONLY — This is NOT financial advice. All data is illustrative and may not reflect current market conditions.
+  Options trading involves substantial risk of loss and is not appropriate for all investors. Past performance does not guarantee future results.
+  Always conduct your own due diligence and consult a licensed financial advisor before making investment decisions.
+  Probabilities shown are estimates based on options market pricing and historical patterns, not guarantees.
+</div>
+
+<script>
+function showTab(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>
